@@ -15,7 +15,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from ..builder.instances.instances import Instance
 from ..builder.instances.launcher_planner import (
@@ -169,7 +169,9 @@ def _generate_compute_unit_launcher_from_data(
     _render_template_to_file("compute_unit_launcher.xml.jinja2", launcher_file, template_data)
 
 
-def generate_module_launch_file(instance: Instance, output_dir: str, forward_args: List[str] | None = None):
+def generate_module_launch_file(
+    instance: Instance | Dict[str, Any], output_dir: str, forward_args: List[str] | None = None
+):
     """Main entry point for launcher generation."""
 
     if isinstance(instance, Instance):
@@ -207,15 +209,14 @@ def generate_module_launch_file(instance: Instance, output_dir: str, forward_arg
             return
         return
 
-    instance_data, _ = extract_system_structure_data(instance)
     logger.debug(f"Generating launcher from system structure data in {output_dir}")
 
-    if instance_data.get("entity_type") != "system":
+    if instance.get("entity_type") != "system":
         logger.debug("Launcher generation expects system-level data; skipping.")
         return
 
     compute_unit_map, component_args_by_id, component_map = build_serialized_system_component_maps(
-        instance_data, forward_args
+        instance, forward_args
     )
 
     for compute_unit, components in compute_unit_map.items():

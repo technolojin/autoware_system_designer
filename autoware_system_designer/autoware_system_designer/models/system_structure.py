@@ -26,6 +26,7 @@ class PortData(TypedDict, total=False):
     namespace: List[str]
     topic: List[str]
     is_global: bool
+    remap_target: Optional[str]
     port_path: str
     event: Optional[EventData]
     connected_ids: List[str]
@@ -58,10 +59,9 @@ class LauncherData(TypedDict, total=False):
     ros2_launch_file: Optional[str]
     node_output: str
     args: str
-    is_ros2_file_launch: bool
+    launch_state: str  # "ros2_launch_file" | "single_node" | "composable_node" | "node_container"
     plugin: str
     executable: str
-    use_container: bool
     container: str
     ports: List[LauncherPortData]
     param_values: List[Dict[str, Any]]

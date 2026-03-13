@@ -118,41 +118,10 @@ def _extract_node_data(node_instance, module_path: List[str]) -> Dict[str, Any]:
 
 
 def _extract_node_data_from_dict(node_instance: Dict[str, Any], module_path: List[str]) -> Dict[str, Any]:
-    """Extract node launcher data from serialized node dictionary."""
-    node_data = {"name": node_instance.get("name", "")}
-
+    """Extract node launcher data from serialized node dictionary (launcher is canonical from LaunchManager)."""
     launch_data = node_instance.get("launcher", {})
-    node_data["package"] = launch_data.get("package", "")
-    node_data["ros2_launch_file"] = launch_data.get("ros2_launch_file", None)
-    node_data["is_ros2_file_launch"] = node_data["ros2_launch_file"] is not None
-    node_data["node_output"] = launch_data.get("node_output", "screen")
-    node_data["args"] = launch_data.get("args", "")
-
-    if not node_data["is_ros2_file_launch"]:
-        node_data["plugin"] = launch_data.get("plugin", "")
-        node_data["executable"] = launch_data.get("executable", "")
-        node_data["use_container"] = launch_data.get("use_container", False)
-        node_data["container"] = launch_data.get("container", "perception_container")
-
-    def normalize_parameter_type(param_type: Any) -> Dict[str, Any]:
-        if isinstance(param_type, dict) and "name" in param_type:
-            return param_type
-        if isinstance(param_type, str):
-            return {"name": param_type}
-        return {"name": str(param_type)}
-
-    node_data["ports"] = launch_data.get("ports", [])
-    node_data["full_namespace_path"] = "/".join(module_path) if module_path else ""
-    node_data["param_values"] = []
-    for param in launch_data.get("param_values", []):
-        param_copy = dict(param)
-        param_copy["parameter_type"] = normalize_parameter_type(param.get("parameter_type"))
-        node_data["param_values"].append(param_copy)
-
-    node_data["param_files"] = []
-    for param_file in launch_data.get("param_files", []):
-        param_file_copy = dict(param_file)
-        param_file_copy["parameter_type"] = normalize_parameter_type(param_file.get("parameter_type"))
-        node_data["param_files"].append(param_file_copy)
-
-    return node_data
+    return {
+        **launch_data,
+        "name": node_instance.get("name"),
+        "full_namespace_path": "/".join(module_path) if module_path else "",
+    }

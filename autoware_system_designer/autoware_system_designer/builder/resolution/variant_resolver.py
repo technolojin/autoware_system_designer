@@ -45,7 +45,6 @@ class VariantResolver:
                 if isinstance(item, dict):
                     key = item.get(key_field)
                     if key and key in base_map:
-                        # Replace existing item
                         merged_list[base_map[key]] = item
                     else:
                         # Append new item

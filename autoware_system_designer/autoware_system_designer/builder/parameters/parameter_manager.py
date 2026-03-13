@@ -22,12 +22,14 @@ from ...exceptions import ParameterConfigurationError, ValidationError
 from ...file_io.source_location import SourceLocation, format_source, source_from_config
 from ...models.parsing.yaml_parser import yaml_parser
 from ...utils.parameter_types import coerce_numeric_value, normalize_type_name
+from ..runtime.execution import LaunchState
 from ..runtime.parameters import (
     Parameter,
     ParameterFile,
     ParameterFileList,
     ParameterList,
     ParameterType,
+    parameter_type_to_str,
 )
 
 if TYPE_CHECKING:
@@ -145,8 +147,9 @@ class ParameterManager:
                 param_type = param.get("parameter_type", {})
                 param_type_name = param_type.get("name") if isinstance(param_type, dict) else str(param_type)
                 param_name = param.get("name")
+                is_ros2_file = node.get("launch_state") == LaunchState.ROS2_LAUNCH_FILE
                 if (
-                    node.get("is_ros2_file_launch")
+                    is_ros2_file
                     and param_type_name in launch_param_types
                     and isinstance(param_name, str)
                     and param_name in available_args
@@ -179,7 +182,7 @@ class ParameterManager:
                         "type": "param",
                         "name": param.name,
                         "value": param.value,
-                        "parameter_type": param.parameter_type,
+                        "parameter_type": parameter_type_to_str(param.parameter_type),
                     }
                 )
 
@@ -206,7 +209,7 @@ class ParameterManager:
                     "name": param_file.name,
                     "path": resolved_path,
                     "allow_substs": param_file.allow_substs,
-                    "parameter_type": param_file.parameter_type,
+                    "parameter_type": parameter_type_to_str(param_file.parameter_type),
                 }
             )
         return result
@@ -294,9 +297,9 @@ class ParameterManager:
             return match.group(0)  # Return original if not found
 
     def _get_package_name(self) -> Optional[str]:
-        """Get package name from instance configuration."""
-        if self.instance.entity_type == "node" and self.instance.configuration:
-            return self.instance.configuration.package_name
+        """Get package name from instance launch_manager."""
+        if self.instance.entity_type == "node" and getattr(self.instance, "launch_manager", None):
+            return self.instance.launch_manager.package_name
         return None
 
     def _normalize_parameter_value(

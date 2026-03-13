@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional
 
+from ..builder.runtime.execution import LaunchState
 from ..exceptions import ValidationError
 from ..file_io.template_renderer import TemplateRenderer
 from ..models.config import ConfigType, NodeConfig
@@ -90,14 +91,15 @@ def create_node_launcher_xml(node_config: NodeConfig) -> str:
     package_name = node_config.package_name
     template_data["package_name"] = package_name
     template_data["ros2_launch_file"] = launch_config.get("ros2_launch_file", None)
-    template_data["is_ros2_file_launch"] = template_data["ros2_launch_file"] is not None
     template_data["node_output"] = launch_config.get("node_output", "screen")
+    launch_state = LaunchState.from_config(launch_config)
+    template_data["launch_state"] = launch_state.value
 
-    if not template_data["is_ros2_file_launch"]:
-        template_data["plugin_name"] = launch_config.get("plugin")
+    if launch_state != LaunchState.ROS2_LAUNCH_FILE:
         template_data["executable_name"] = launch_config.get("executable")
-        template_data["use_container"] = launch_config.get("use_container", False)
-        template_data["container_name"] = launch_config.get("container_name")
+        template_data["container_target"] = launch_config.get("container_target")
+        if launch_state == LaunchState.COMPOSABLE_NODE:
+            template_data["plugin_name"] = launch_config.get("plugin")
 
     template_data["inputs"] = node_config.inputs or []
     template_data["outputs"] = node_config.outputs or []
