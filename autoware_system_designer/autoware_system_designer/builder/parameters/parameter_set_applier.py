@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from ...exceptions import ValidationError
 from ...file_io.source_location import format_source, source_from_config
 from ...models.parsing.data_validator import entity_name_decode
+from ..runtime.namespace import namespace_path_is_descendant
 from ..runtime.parameters import ParameterType
 
 if TYPE_CHECKING:
@@ -84,8 +85,11 @@ def apply_parameter_set(
                     # Only apply if the target node is under this component's namespace
                     if (
                         check_namespace
-                        and node_namespace != target_instance.namespace_str
-                        and not node_namespace.startswith(target_instance.namespace_str + "/")
+                        and not namespace_path_is_descendant(
+                            node_namespace,
+                            target_instance.namespace_str,
+                            include_self=True,
+                        )
                     ):
                         logger.debug(
                             f"Parameter set '{param_set_name}' skip node '{node_namespace}' (component namespace '{target_instance.namespace_str}')"

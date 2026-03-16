@@ -23,6 +23,7 @@ from ...file_io.source_location import SourceLocation, format_source, source_fro
 from ...models.parsing.yaml_parser import yaml_parser
 from ...utils.parameter_types import coerce_numeric_value, normalize_type_name
 from ..runtime.execution import LaunchState
+from ..runtime.namespace import is_root_namespace, namespace_path_is_descendant, namespace_paths_equal
 from ..runtime.parameters import (
     Parameter,
     ParameterFile,
@@ -435,7 +436,7 @@ class ParameterManager:
             direct_parameter_type: ParameterType for directly specified parameters
         """
         # Handle global parameters (root node)
-        if node_namespace == "/":
+        if is_root_namespace(node_namespace):
             self.apply_parameters_to_all_nodes(
                 param_files,
                 param_values,
@@ -612,7 +613,7 @@ class ParameterManager:
         # Helper for recursive search
         def _search(inst):
             # Check if current instance matches
-            if inst.entity_type == "node" and inst.namespace_str == target_namespace:
+            if inst.entity_type == "node" and namespace_paths_equal(inst.namespace_str, target_namespace):
                 matches.append(inst)
 
             # Optimization: only traverse if target could be deeper
@@ -620,10 +621,10 @@ class ParameterManager:
             # OR current namespace is root "/"
             # OR current namespace is a prefix of target
 
-            if (
-                inst.namespace_str == "/"
-                or target_namespace.startswith(inst.namespace_str + "/")
-                or inst.namespace_str == target_namespace
+            if is_root_namespace(inst.namespace_str) or namespace_path_is_descendant(
+                target_namespace,
+                inst.namespace_str,
+                include_self=True,
             ):
                 for child in inst.children.values():
                     _search(child)

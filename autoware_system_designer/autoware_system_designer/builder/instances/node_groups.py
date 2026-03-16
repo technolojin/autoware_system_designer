@@ -1,10 +1,10 @@
 import logging
-from fnmatch import fnmatch
 from typing import TYPE_CHECKING, Any
 
 from ...exceptions import ValidationError
 from ..config.launch_manager import LaunchManager
 from ..runtime.execution import LaunchConfig, LaunchState
+from ..runtime.namespace import node_group_pattern_matches, resolve_common_namespace
 
 if TYPE_CHECKING:
     from .instances import Instance
@@ -70,7 +70,7 @@ def apply_node_groups(instance: "Instance") -> None:
                 if node_instance.unique_id in matched_ids:
                     continue
 
-                if _node_group_pattern_matches(pattern, node_instance.node_path):
+                if node_group_pattern_matches(pattern, node_instance.node_path):
                     matched_nodes.append(node_instance)
                     matched_ids.add(node_instance.unique_id)
 
@@ -170,7 +170,7 @@ def _create_group_container_node(
         group_name=group_name,
         group_type=group_type,
         compute_unit=compute_unit,
-        namespace=_resolve_group_namespace(matched_nodes),
+        namespace=resolve_common_namespace(node_instance.namespace for node_instance in matched_nodes),
     )
     instance.children[group_name] = container_instance
 
@@ -222,45 +222,3 @@ def _iter_node_instances(instance: "Instance"):
 
     for child in instance.children.values():
         yield from _iter_node_instances(child)
-
-
-def _resolve_group_namespace(matched_nodes: list["Instance"]) -> list[str]:
-    if not matched_nodes:
-        return []
-
-    common_namespace = matched_nodes[0].namespace.copy()
-    for node_instance in matched_nodes[1:]:
-        max_prefix_len = min(len(common_namespace), len(node_instance.namespace))
-        idx = 0
-        while idx < max_prefix_len and common_namespace[idx] == node_instance.namespace[idx]:
-            idx += 1
-        common_namespace = common_namespace[:idx]
-        if not common_namespace:
-            break
-
-    return common_namespace
-
-
-def _normalize_node_group_path(raw_path: str) -> str:
-    path = raw_path.strip()
-    if not path.startswith("/"):
-        path = f"/{path}"
-
-    if len(path) > 1 and path.endswith("/"):
-        path = path.rstrip("/")
-
-    return path
-
-
-def _node_group_pattern_matches(pattern: str, node_path: str) -> bool:
-    normalized_pattern = _normalize_node_group_path(pattern)
-    normalized_node_path = _normalize_node_group_path(node_path)
-
-    # glob-style pattern (supports broad wildcard matching)
-    if any(ch in normalized_pattern for ch in ["*", "?", "["]):
-        return fnmatch(normalized_node_path, normalized_pattern)
-
-    # plain path: treat as prefix to include all nodes under the path
-    if normalized_pattern == "/":
-        return True
-    return normalized_node_path == normalized_pattern or normalized_node_path.startswith(f"{normalized_pattern}/")

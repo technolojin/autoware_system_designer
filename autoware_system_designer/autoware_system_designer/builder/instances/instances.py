@@ -23,6 +23,7 @@ from ..config.launch_manager import LaunchManager
 from ..graph.event_manager import EventManager
 from ..graph.link_manager import LinkManager
 from ..parameters.parameter_manager import ParameterManager
+from ..runtime.namespace import Namespace
 from .instance_serializer import (
     collect_instance_data,
     collect_system_structure,
@@ -36,11 +37,9 @@ class Instance:
     Manages configuration, topology, interfaces, parameters, and events.
     """
 
-    def __init__(self, name: str, compute_unit: str = "", namespace: list[str] = [], layer: int = 0):
+    def __init__(self, name: str, compute_unit: str = "", namespace: list[str] | Namespace | None = None, layer: int = 0):
         self.name: str = name
-        self.namespace: List[str] = namespace.copy()
-        # add the instance name to the namespace
-        self.namespace_str: str = "/" + "/".join(self.namespace) if self.namespace else ""
+        self.namespace: Namespace = Namespace(namespace)
 
         self.compute_unit: str = compute_unit
         self.layer: int = layer
@@ -85,15 +84,18 @@ class Instance:
         self.is_initialized = False
 
     @property
+    def namespace_str(self) -> str:
+        """Get the namespace as a string."""
+        return self.namespace.to_string()
+
+    @property
     def node_path(self) -> str:
         """Get the full node path for this instance (namespace + name)."""
-        if self.namespace:
-            return "/" + "/".join(self.namespace) + "/" + self.name
-        return "/" + self.name
+        return self.namespace.node_path(self.name)
 
     @property
     def unique_id(self):
-        return generate_unique_id(self.namespace, "instance", self.compute_unit, self.layer, self.name)
+        return generate_unique_id(self.namespace.copy(), "instance", self.compute_unit, self.layer, self.name)
 
     @property
     def vis_guide(self) -> dict:
