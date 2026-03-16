@@ -21,7 +21,7 @@ components:
   - name: lidar
     entity: LidarDummy.module
     namespace: sensing/lidar
-    compute_unit: perception_ecu_1
+    compute_unit: main_ecu
   - name: map_loader
     entity: MapDummy.node
     namespace: map
@@ -56,7 +56,7 @@ connections:
 
 node_groups:
   - name: pointcloud_container
-    type: ros2_component_container_multi-thread
+    type: ros2_component_container_mt
     nodes:
       - /sensing/lidar/*
       - /perception/object_recognition/detector_a1/node_detector
@@ -73,7 +73,7 @@ simulation:
         parameter_set: [PerceptionModuleABuild.parameter_set]
     node_groups:
       - name: pointcloud_container
-        type: ros2_component_container_multi-thread
+        type: ros2_component_container_mt
         nodes:
           - /sensing/lidar/*
           - /perception/object_recognition/detector_a1/node_detector

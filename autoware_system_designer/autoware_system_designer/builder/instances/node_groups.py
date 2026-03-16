@@ -1,11 +1,39 @@
 import logging
+from pathlib import Path
 from fnmatch import fnmatch
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+from ...exceptions import ValidationError
+from ...models.config import NodeConfig
+from ..config.launch_manager import LaunchManager
 
 if TYPE_CHECKING:
 	from .instances import Instance
 
 logger = logging.getLogger(__name__)
+
+
+# Extensible registry: add a new node-group container type here.
+NODE_GROUP_CONTAINER_SPECS = {
+	"ros2_component_container_mt": {
+		"package_name": "rclcpp_components",
+		"package_provider": "ros2",
+		"launch": {
+			"executable": "component_container_mt",
+			"node_output": "both",
+			"type": "node_container",
+		},
+	},
+	"ros2_component_container": {
+		"package_name": "rclcpp_components",
+		"package_provider": "ros2",
+		"launch": {
+			"executable": "component_container",
+			"node_output": "both",
+			"type": "node_container",
+		},
+	},
+}
 
 
 def apply_node_groups(instance: "Instance") -> None:
@@ -15,29 +43,22 @@ def apply_node_groups(instance: "Instance") -> None:
 	  - Supports wildcard patterns (glob) in each node-group ``nodes`` entry.
 	  - For plain paths (no glob), treats them as path prefixes so all nodes under
 		that path are registered.
-	  - Missing/invalid entries are warned and skipped (no hard failure).
+	  - Strictly validates node-group name uniqueness and supported type.
+	  - Creates required container nodes directly from node-group configuration.
 	"""
 	node_groups = getattr(instance.configuration, "node_groups", None)
 	if not node_groups:
 		return
+	if not isinstance(node_groups, list):
+		raise ValidationError("'node_groups' must be a list")
 
+	validated_groups = _validate_node_groups(node_groups)
 	all_node_instances = list(_iter_node_instances(instance))
 
-	for group in node_groups:
-		if not isinstance(group, dict):
-			logger.warning("Skipping invalid node group entry (expected mapping): %r", group)
-			continue
-
+	for group in validated_groups:
 		group_name = group.get("name")
-		group_type = group.get("type")
 		node_patterns = group.get("nodes")
-
-		if not group_name or not isinstance(group_name, str):
-			logger.warning("Skipping node group with invalid name: %r", group)
-			continue
-		if not isinstance(node_patterns, list):
-			logger.warning("Node group '%s' has invalid 'nodes' field (expected list), skipping", group_name)
-			continue
+		group_type = group.get("type")
 
 		logger.info("Applying node group '%s' (type=%s)", group_name, group_type)
 
@@ -46,8 +67,7 @@ def apply_node_groups(instance: "Instance") -> None:
 
 		for pattern in node_patterns:
 			if not isinstance(pattern, str) or not pattern.strip():
-				logger.warning("Node group '%s' contains invalid node pattern: %r", group_name, pattern)
-				continue
+				raise ValidationError(f"Node group '{group_name}' contains invalid node pattern: {pattern!r}")
 
 			for node_instance in all_node_instances:
 				if node_instance.unique_id in matched_ids:
@@ -57,18 +77,28 @@ def apply_node_groups(instance: "Instance") -> None:
 					matched_nodes.append(node_instance)
 					matched_ids.add(node_instance.unique_id)
 
+		group_compute_unit = _resolve_group_compute_unit(
+			group_name=group_name,
+			matched_nodes=matched_nodes,
+			default_compute_unit=instance.compute_unit,
+		)
+
+		_ensure_group_container_node(
+			instance=instance,
+			group_name=group_name,
+			group_type=group_type,
+			compute_unit=group_compute_unit,
+		)
+
 		if not matched_nodes:
 			logger.warning("Node group '%s' matched no nodes; continuing", group_name)
 			continue
 
 		for node_instance in matched_nodes:
 			if not node_instance.launch_manager:
-				logger.warning(
-					"Node group '%s' matched node '%s' without launch manager; skipping",
-					group_name,
-					node_instance.namespace_str,
+				raise ValidationError(
+					f"Node group '{group_name}' matched node '{node_instance.namespace_str}' without launch manager"
 				)
-				continue
 
 			previous_target = node_instance.launch_manager.launch_config.container_target
 			if previous_target and previous_target != group_name:
@@ -80,6 +110,165 @@ def apply_node_groups(instance: "Instance") -> None:
 				)
 
 			node_instance.launch_manager.update(container_target=group_name)
+
+
+def _resolve_group_compute_unit(
+	*,
+	group_name: str,
+	matched_nodes: list["Instance"],
+	default_compute_unit: str,
+) -> str:
+	if not matched_nodes:
+		return default_compute_unit
+
+	compute_units = {node_instance.compute_unit for node_instance in matched_nodes}
+	if len(compute_units) > 1:
+		sorted_compute_units = sorted(compute_units)
+		raise ValidationError(
+			f"Node group '{group_name}' matches nodes across multiple compute units: {sorted_compute_units}"
+		)
+
+	return next(iter(compute_units))
+
+
+def _validate_node_groups(node_groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+	validated_groups: list[dict[str, Any]] = []
+	seen_group_names: set[str] = set()
+
+	for idx, group in enumerate(node_groups):
+		if not isinstance(group, dict):
+			raise ValidationError(
+				f"Node group entry at index {idx} must be a mapping, got: {type(group).__name__}"
+			)
+
+		group_name = group.get("name")
+		group_type = group.get("type")
+		node_patterns = group.get("nodes")
+
+		if not group_name or not isinstance(group_name, str):
+			raise ValidationError(f"Node group at index {idx} has invalid 'name': {group_name!r}")
+		if group_name in seen_group_names:
+			raise ValidationError(f"Duplicate node group name found: '{group_name}'")
+		seen_group_names.add(group_name)
+
+		if not isinstance(group_type, str) or not group_type:
+			raise ValidationError(f"Node group '{group_name}' has invalid 'type': {group_type!r}")
+		if group_type not in NODE_GROUP_CONTAINER_SPECS:
+			supported_types = ", ".join(sorted(NODE_GROUP_CONTAINER_SPECS.keys()))
+			raise ValidationError(
+				f"Node group '{group_name}' uses unsupported type '{group_type}'. Supported types: {supported_types}"
+			)
+
+		if not isinstance(node_patterns, list):
+			raise ValidationError(f"Node group '{group_name}' has invalid 'nodes' field (expected list)")
+
+		validated_groups.append(group)
+
+	return validated_groups
+
+
+def _ensure_group_container_node(
+	*,
+	instance: "Instance",
+	group_name: str,
+	group_type: str,
+	compute_unit: str,
+) -> "Instance":
+	if group_name in instance.children:
+		raise ValidationError(f"Node group name '{group_name}' conflicts with existing system component name")
+
+	container_instance = _create_container_node_instance(
+		parent_instance=instance,
+		group_name=group_name,
+		group_type=group_type,
+		compute_unit=compute_unit,
+	)
+	instance.children[group_name] = container_instance
+
+	logger.info(
+		"Created synthetic container node for group '%s' (type=%s, compute_unit=%s)",
+		group_name,
+		group_type,
+		compute_unit,
+	)
+
+	return container_instance
+
+
+def _create_container_node_instance(
+	parent_instance: "Instance", group_name: str, group_type: str, compute_unit: str
+) -> "Instance":
+	from .instances import Instance
+
+	container_spec = NODE_GROUP_CONTAINER_SPECS[group_type]
+
+	container_instance = Instance(
+		name=group_name,
+		compute_unit=compute_unit,
+		namespace=[],
+		layer=parent_instance.layer,
+	)
+	container_instance.parent = parent_instance
+
+	container_instance.configuration = _build_synthetic_container_node_config(
+		system_file_path=parent_instance.configuration.file_path,
+		group_name=group_name,
+		container_spec=container_spec,
+	)
+	container_instance.entity_type = "node"
+	container_instance.launch_manager = LaunchManager.from_config(container_instance.configuration)
+
+	container_instance.is_initialized = True
+
+	return container_instance
+
+
+def _build_synthetic_container_node_config(
+	*,
+	system_file_path: Path,
+	group_name: str,
+	container_spec: dict[str, Any],
+) -> NodeConfig:
+	return NodeConfig(
+		name=f"{group_name}.synthetic.node",
+		full_name=f"{group_name}.synthetic.node",
+		entity_type="node",
+		config={
+			"name": f"{group_name}.synthetic.node",
+			"package": {
+				"name": container_spec["package_name"],
+				"provider": container_spec["package_provider"],
+			},
+			"launch": container_spec["launch"],
+			"subscribers": [],
+			"publishers": [],
+			"param_files": [],
+			"param_values": [],
+			"processes": [
+				{
+					"name": "run",
+					"trigger_conditions": [],
+					"outcomes": [],
+				}
+			],
+		},
+		file_path=system_file_path,
+		package=container_spec["package_name"],
+		package_name=container_spec["package_name"],
+		package_provider=container_spec["package_provider"],
+		launch=container_spec["launch"],
+		inputs=[],
+		outputs=[],
+		param_files=[],
+		param_values=[],
+		processes=[
+			{
+				"name": "run",
+				"trigger_conditions": [],
+				"outcomes": [],
+			}
+		],
+	)
 
 
 def _iter_node_instances(instance: "Instance"):
