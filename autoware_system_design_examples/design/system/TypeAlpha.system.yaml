@@ -62,7 +62,6 @@ connections:
   - - object_recognition.subscriber.vector_map
     - map_loader.publisher.vector_map
 
-
 # mode configuration
 simulation:
   override:

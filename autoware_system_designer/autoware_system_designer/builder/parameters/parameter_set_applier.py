@@ -83,13 +83,10 @@ def apply_parameter_set(
                     node_source = source_from_config(cfg_param_set, f"/parameters/{node_idx}/node")
 
                     # Only apply if the target node is under this component's namespace
-                    if (
-                        check_namespace
-                        and not namespace_path_is_descendant(
-                            node_namespace,
-                            target_instance.namespace,
-                            include_self=True,
-                        )
+                    if check_namespace and not namespace_path_is_descendant(
+                        node_namespace,
+                        target_instance.namespace,
+                        include_self=True,
                     ):
                         logger.debug(
                             f"Parameter set '{param_set_name}' skip node '{node_namespace}' (component namespace '{target_instance.namespace_str}')"

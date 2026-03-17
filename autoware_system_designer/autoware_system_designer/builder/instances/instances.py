@@ -37,7 +37,9 @@ class Instance:
     Manages configuration, topology, interfaces, parameters, and events.
     """
 
-    def __init__(self, name: str, compute_unit: str = "", namespace: list[str] | Namespace | None = None, layer: int = 0):
+    def __init__(
+        self, name: str, compute_unit: str = "", namespace: list[str] | Namespace | None = None, layer: int = 0
+    ):
         self.name: str = name
         self.namespace: Namespace = Namespace(namespace)
 
