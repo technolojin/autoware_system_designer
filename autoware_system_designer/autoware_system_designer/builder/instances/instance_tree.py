@@ -66,7 +66,7 @@ def set_system_instances(instance: "Instance", config_registry: "ConfigRegistry"
 
         instance.children[instance_name] = child_instance
         logger.debug(
-            f"System instance '{instance.namespace_str}' added component '{instance_name}' (uid={child_instance.unique_id})"
+            f"System instance '{instance.node_path}' added component '{instance_name}' (uid={child_instance.unique_id})"
         )
 
     # Apply system-level parameter sets
@@ -113,7 +113,7 @@ def set_module_instances(
     config_registry: "ConfigRegistry",
 ) -> None:
     """Set instances for module entity type."""
-    logger.info(f"Setting module entity {entity_id} for instance {instance.namespace_str}")
+    logger.info(f"Setting module entity {entity_id} for instance {instance.node_path}")
     instance.configuration = config_registry.get_module(entity_name)
     instance.entity_type = "module"
 
@@ -139,7 +139,7 @@ def set_node_instances(
     config_registry: "ConfigRegistry",
 ) -> None:
     """Set instances for node entity type."""
-    logger.info(f"Setting node entity {entity_id} for instance {instance.namespace_str}")
+    logger.info(f"Setting node entity {entity_id} for instance {instance.node_path}")
     instance.configuration = config_registry.get_node(entity_name)
     instance.entity_type = "node"
     instance.launch_manager = LaunchManager.from_config(instance.configuration)

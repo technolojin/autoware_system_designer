@@ -86,11 +86,6 @@ class Instance:
         self.is_initialized = False
 
     @property
-    def namespace_str(self) -> str:
-        """Get the namespace as a string."""
-        return self.namespace.to_string()
-
-    @property
     def node_path(self) -> str:
         """Get the full node path for this instance (namespace + name).
 
@@ -101,7 +96,7 @@ class Instance:
         include the node name, so it must be appended.
         """
         if self.parent is not None and self.parent.entity_type == "module":
-            return self.namespace_str
+            return self.namespace.to_string()
         return self.namespace.node_path(self.name)
 
     @property

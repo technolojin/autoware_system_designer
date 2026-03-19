@@ -111,7 +111,7 @@ class ParameterTemplateGenerator:
         current_namespace: str = "",
     ) -> None:
         if instance.entity_type == "node":
-            full_namespace = instance.namespace_str
+            node_path = instance.node_path
 
             parameter_files_list, parameters = self._extract_parameters_from_manager(instance)
             parameter_files = {pf["name"]: pf["path"] for pf in parameter_files_list}
@@ -123,7 +123,7 @@ class ParameterTemplateGenerator:
                 elif getattr(instance, "configuration", None) and getattr(instance.configuration, "launch", None):
                     package = instance.configuration.launch.get("package", "unknown_package")
                 node_info = {
-                    "node": full_namespace,
+                    "node": node_path,
                     "parameter_files": parameter_files,
                     "parameters": parameters,
                     "package": package,
@@ -173,17 +173,14 @@ class ParameterTemplateGenerator:
         self, instance_data: Dict[str, Any], node_data: List[Dict[str, Any]]
     ) -> None:
         if instance_data.get("entity_type") == "node":
-            namespace_str = instance_data.get("namespace_str")
-            if not namespace_str:
-                namespace = instance_data.get("namespace", [])
-                namespace_str = "/" + "/".join(namespace) if namespace else "/"
-
-            parameter_files_list, parameters = self._extract_parameters_from_data(instance_data, namespace_str)
+            node_path = "/" + "/".join(instance_data.get("namespace", [])) + "/" + instance_data.get("name", "unknown_node")
+    
+            parameter_files_list, parameters = self._extract_parameters_from_data(instance_data, node_path)
             parameter_files = {pf["name"]: pf["path"] for pf in parameter_files_list}
 
             if parameter_files or parameters:
                 node_info = {
-                    "node": namespace_str,
+                    "node": node_path,
                     "parameter_files": parameter_files,
                     "parameters": parameters,
                     "package": instance_data.get("launcher", {}).get("package", "unknown_package"),
@@ -194,12 +191,12 @@ class ParameterTemplateGenerator:
             self._collect_node_parameter_files_recursive_data(child, node_data)
 
     def _extract_parameters_from_data(
-        self, instance_data: Dict[str, Any], namespace_str: str
+        self, instance_data: Dict[str, Any], node_path: str
     ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         parameter_files: List[Dict[str, Any]] = []
         parameters: List[Dict[str, Any]] = []
 
-        base_path = namespace_str
+        base_path = node_path
         for param_file in instance_data.get("parameter_files_all", []):
             param_name = param_file.get("name")
             if not param_name:
@@ -240,7 +237,7 @@ class ParameterTemplateGenerator:
         all_parameter_files = node_instance.parameter_manager.get_all_parameter_files()
         all_parameters = node_instance.parameter_manager.get_all_parameters()
 
-        base_path = node_instance.namespace_str
+        base_path = node_instance.node_path
 
         for param_file in all_parameter_files:
             param_name = param_file.name

@@ -97,7 +97,7 @@ def apply_node_groups(instance: "Instance") -> None:
             if previous_target and previous_target != container_target_path:
                 logger.warning(
                     "Node '%s' container target reassigned from '%s' to '%s'",
-                    node_instance.namespace_str,
+                    node_instance.node_path,
                     previous_target,
                     container_target_path,
                 )

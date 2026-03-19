@@ -81,7 +81,6 @@ class InstanceData(TypedDict, total=False):
     unique_id: str
     entity_type: str
     namespace: List[str]
-    namespace_str: str
     compute_unit: Optional[str]
     vis_guide: Optional[Dict[str, Any]]
     in_ports: List[PortData]

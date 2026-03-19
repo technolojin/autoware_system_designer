@@ -89,7 +89,7 @@ def apply_parameter_set(
                         include_self=True,
                     ):
                         logger.debug(
-                            f"Parameter set '{param_set_name}' skip node '{node_namespace}' (component namespace '{target_instance.namespace_str}')"
+                            f"Parameter set '{param_set_name}' skip node '{node_namespace}' (component path '{target_instance.node_path}')"
                         )
                         continue
 
