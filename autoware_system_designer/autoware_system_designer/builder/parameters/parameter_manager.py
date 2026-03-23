@@ -634,12 +634,12 @@ class ParameterManager:
             # OR current namespace is root "/"
             # OR current namespace is a prefix of target
 
-            should_traverse = is_root_namespace(inst.resolved_path)
+            should_traverse = is_root_namespace(inst.path)
             if not should_traverse:
                 candidate_path = target_namespace_path if has_wildcard else target_path
                 should_traverse = is_root_namespace(candidate_path) or namespace_path_is_descendant(
                     candidate_path,
-                    inst.resolved_path,
+                    inst.path,
                     include_self=True,
                 )
 
