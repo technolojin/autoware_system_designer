@@ -111,8 +111,6 @@ class ParameterTemplateGenerator:
         current_namespace: str = "",
     ) -> None:
         if instance.entity_type == "node":
-            node_path = instance.node_path
-
             parameter_files_list, parameters = self._extract_parameters_from_manager(instance)
             parameter_files = {pf["name"]: pf["path"] for pf in parameter_files_list}
 
@@ -123,7 +121,7 @@ class ParameterTemplateGenerator:
                 elif getattr(instance, "configuration", None) and getattr(instance.configuration, "launch", None):
                     package = instance.configuration.launch.get("package", "unknown_package")
                 node_info = {
-                    "node": node_path,
+                    "node": instance.path,
                     "parameter_files": parameter_files,
                     "parameters": parameters,
                     "package": package,
@@ -247,7 +245,7 @@ class ParameterTemplateGenerator:
         all_parameter_files = node_instance.parameter_manager.get_all_parameter_files()
         all_parameters = node_instance.parameter_manager.get_all_parameters()
 
-        base_path = node_instance.node_path
+        base_path = node_instance.path
 
         for param_file in all_parameter_files:
             param_name = param_file.name

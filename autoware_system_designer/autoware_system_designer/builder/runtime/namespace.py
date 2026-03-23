@@ -43,13 +43,6 @@ class Namespace(list[str]):
         """
         return "/" + "/".join(self) if self else "/"
 
-    def node_path(self, node_name: str) -> str:
-        """Return full node path for a node under this namespace."""
-        if self:
-            return "/" + "/".join(self) + f"/{node_name}"
-        return f"/{node_name}"
-
-
 def resolve_common_namespace(namespaces: Iterable[Sequence[str]]) -> list[str]:
     """Resolve longest common namespace prefix from the given namespaces."""
     namespace_list = [list(ns) for ns in namespaces]
