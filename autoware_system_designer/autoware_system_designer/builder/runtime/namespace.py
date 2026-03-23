@@ -41,7 +41,7 @@ class Namespace(list[str]):
 
         Returns an empty string for root namespace to preserve existing behavior.
         """
-        return "/" + "/".join(self) if self else ""
+        return "/" + "/".join(self) if self else "/"
 
     def node_path(self, node_name: str) -> str:
         """Return full node path for a node under this namespace."""

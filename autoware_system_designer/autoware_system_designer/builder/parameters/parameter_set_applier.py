@@ -108,12 +108,7 @@ def apply_parameter_set(
                         continue
 
                     # Pre-check: verify the target node actually exists in this
-                    # component's instance subtree.  Sibling system components can
-                    # have nested namespaces (e.g. object_recognition at
-                    # /perception/object_recognition and centerpoint at
-                    # /perception/object_recognition/detection/centerpoint).  The
-                    # namespace descendant check above cannot distinguish these
-                    # cases, so we verify before resolving parameters.
+                    # component's instance subtree.
                     if not target_instance.parameter_manager.find_matching_nodes(node_namespace):
                         logger.debug(
                             f"Parameter set '{param_set_name}' skip node '{node_namespace}' "
