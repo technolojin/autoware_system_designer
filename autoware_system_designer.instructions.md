@@ -37,8 +37,6 @@ Represents a single ROS 2 node.
   - `executable`: (Optional) Name of the executable.
   - `ros2_launch_file`: (Required if `executable` and `plugin` are not set) Alternative setting used for normal ros2 launcher wrapper.
   - `node_output`: (Optional) `screen`, `log`, etc.
-  - `use_container`: (Optional) `true`/`false`.
-  - `container_name`: (Required if `use_container: true`) Name of the component container.
 - `subscribers`: List of input ports (subscribers).
   - `name`: Port name. Can include slashes (e.g., `perception/objects`).
   - `message_type`: Full ROS message type (e.g., `sensor_msgs/msg/PointCloud2`).
@@ -185,6 +183,10 @@ Top-level entry point defining the complete system.
   - `namespace`: ROS namespace prefix.
   - `compute_unit`: Hardware resource identifier (e.g., `main_ecu`).
   - `parameter_set`: (Optional) Parameter set file name(s) to apply. Can be a string or an array of strings.
+- `node_groups`: (Optional) Group nodes into a ROS 2 component container (synthetic container node).
+  - `name`: Unique group name. It will be used as the component name for the container.
+  - `type`: Node group execution type. select `ros2_component_container_mt` or `ros2_component_container`.
+  - `nodes`: List of non-empty path patterns. Glob patterns (`*`, `?`, `[...]`) match the full node path.
 - `connections`: Top-level wiring between components. List of connection pairs, where each connection is a list of two port paths. Supports wildcards (e.g., `component.publisher.^` for wildcard).
 
 **Mode-Specific Overrides:**
@@ -356,6 +358,12 @@ components:
     namespace: sensing
     compute_unit: main_ecu
     parameter_set: sample_system_sensing.parameter_set
+
+node_groups:
+  - name: sensing_container
+    type: ros2_component_container_mt
+    nodes:
+      - /sensing
 connections:
   - - localization.publisher.kinematic_state
     - sensing.subscriber.odometry
@@ -366,6 +374,11 @@ LoggingSimulation:
         entity: SampleSensorKit_sim.module
         namespace: sensing
         compute_unit: main_ecu
+    node_groups:
+      - name: sensing_container
+        type: ros2_component_container_mt
+        nodes:
+          - /sensing
 ```
 
 ### Parameter Set Example (0.3.0)

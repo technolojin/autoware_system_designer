@@ -62,7 +62,7 @@ def serialize_parameter_type(param_type) -> str:
 
 def collect_launcher_data(instance: "Instance") -> Dict[str, Any]:
     """Collect node data required for launcher generation."""
-    if instance.entity_type != "node" or not instance.configuration:
+    if instance.entity_type != "node":
         return {}
 
     if getattr(instance, "launch_manager", None) is not None:
@@ -76,8 +76,8 @@ def collect_instance_data(instance: "Instance") -> InstanceData:
         "name": instance.name,
         "unique_id": instance.unique_id,
         "entity_type": instance.entity_type,
-        "namespace": instance.namespace,
-        "namespace_str": instance.namespace_str,
+        "namespace": instance.namespace.to_string(),
+        "path": instance.path,
         "compute_unit": instance.compute_unit,
         "vis_guide": instance.vis_guide,
         "in_ports": [serialize_port(p) for p in instance.link_manager.get_all_in_ports()],

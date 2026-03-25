@@ -6,13 +6,35 @@ from ...file_io.source_location import format_source, source_from_config
 from ...models.parsing.data_validator import entity_name_decode
 from ..config.launch_manager import LaunchManager
 from ..parameters.parameter_set_applier import apply_parameter_set
+from ..runtime.namespace import Namespace
 from ..runtime.parameters import ParameterType
+from .node_groups import apply_node_groups
 
 if TYPE_CHECKING:
     from ..config.config_registry import ConfigRegistry
     from .instances import Instance
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_component_path(component_name: str, raw_path: str | None) -> tuple[Namespace, Namespace]:
+    """Resolve component namespace and full component path."""
+    if raw_path and not isinstance(raw_path, str):
+        raise ValidationError(f"Invalid component path type for '{component_name}': {type(raw_path).__name__}")
+
+    path = (raw_path or "").strip()
+    # empty raw_path: place component under root with its name as namespace
+    if not path:
+        resolved_path = Namespace([component_name])
+        return Namespace(), resolved_path
+
+    # raw_path is root: place component directly at root
+    resolved_path = Namespace.from_path(path)
+    if not resolved_path:
+        return Namespace(), Namespace()
+
+    # raw_path is not root: remapped component. decompose to namespace and name
+    return Namespace(resolved_path[:-1]), resolved_path
 
 
 def set_instances(
@@ -44,15 +66,11 @@ def set_system_instances(instance: "Instance", config_registry: "ConfigRegistry"
         compute_unit_name = cfg_component.get("compute_unit")
         instance_name = cfg_component.get("name")
         entity_id = cfg_component.get("entity")
-        namespace = cfg_component.get("namespace")
-        if namespace:
-            if isinstance(namespace, str):
-                namespace = namespace.split("/") if "/" in namespace else [namespace]
-        else:
-            namespace = []
+        namespace, resolved_path = _resolve_component_path(instance_name, cfg_component.get("path"))
 
         # create instance
         child_instance = _create_child_instance(instance_name, compute_unit_name, namespace, instance)
+        child_instance.set_resolved_path(resolved_path)
 
         try:
             set_instances(child_instance, entity_id, config_registry)
@@ -65,7 +83,7 @@ def set_system_instances(instance: "Instance", config_registry: "ConfigRegistry"
 
         instance.children[instance_name] = child_instance
         logger.debug(
-            f"System instance '{instance.namespace_str}' added component '{instance_name}' (uid={child_instance.unique_id})"
+            f"System instance '{instance.path}' added component '{instance_name}' (uid={child_instance.unique_id})"
         )
 
     # Apply system-level parameter sets
@@ -98,6 +116,9 @@ def set_system_instances(instance: "Instance", config_registry: "ConfigRegistry"
         child_instance = instance.children[instance_name]
         apply_parameter_set(instance, child_instance, cfg_component, config_registry)
 
+    # Third pass: set node groups.
+    apply_node_groups(instance)
+
     # all children are initialized
     instance.is_initialized = True
 
@@ -109,7 +130,7 @@ def set_module_instances(
     config_registry: "ConfigRegistry",
 ) -> None:
     """Set instances for module entity type."""
-    logger.info(f"Setting module entity {entity_id} for instance {instance.namespace_str}")
+    logger.info(f"Setting module entity {entity_id} for instance {instance.path}")
     instance.configuration = config_registry.get_module(entity_name)
     instance.entity_type = "module"
 
@@ -135,7 +156,7 @@ def set_node_instances(
     config_registry: "ConfigRegistry",
 ) -> None:
     """Set instances for node entity type."""
-    logger.info(f"Setting node entity {entity_id} for instance {instance.namespace_str}")
+    logger.info(f"Setting node entity {entity_id} for instance {instance.path}")
     instance.configuration = config_registry.get_node(entity_name)
     instance.entity_type = "node"
     instance.launch_manager = LaunchManager.from_config(instance.configuration)
@@ -161,7 +182,7 @@ def create_module_children(instance: "Instance", config_registry: "ConfigRegistr
         child_instance = _create_child_instance(
             child_name,
             instance.compute_unit,
-            instance.namespace + [child_name],
+            instance.resolved_path,
             instance,
             layer_delta=1,
         )

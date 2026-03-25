@@ -46,6 +46,7 @@ The top-level description of a complete autonomous driving system. It defines:
 
 - **Variables**: System-wide configuration variables and variable files.
 - **Components**: Top-level nodes/modules with compute unit assignment, namespaces, and parameter sets.
+- **Node Groups**: Group nodes by listing their node paths (currently ROS 2 component containers are implemented).
 - **Connections**: Data flow between components.
 - **Modes**: Operation modes (e.g., Runtime, Simulation) with mode-specific overrides.
 

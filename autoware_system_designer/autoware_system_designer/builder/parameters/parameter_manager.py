@@ -23,6 +23,13 @@ from ...file_io.source_location import SourceLocation, format_source, source_fro
 from ...models.parsing.yaml_parser import yaml_parser
 from ...utils.parameter_types import coerce_numeric_value, normalize_type_name
 from ..runtime.execution import LaunchState
+from ..runtime.namespace import (
+    is_root_namespace,
+    namespace_path_is_descendant,
+    namespace_paths_equal,
+    node_group_pattern_matches,
+    resolve_common_namespace_from_paths,
+)
 from ..runtime.parameters import (
     Parameter,
     ParameterFile,
@@ -341,7 +348,7 @@ class ParameterManager:
 
         if path is None:
             raise ParameterConfigurationError(
-                f"path is None. package_name: {package_name}, node_namespace: {self.instance.namespace_str}, path: {path}"
+                f"path is None. package_name: {package_name}, node_path: {self.instance.path}, path: {path}"
             )
 
         # Resolve any substitutions in the path first
@@ -408,7 +415,7 @@ class ParameterManager:
 
     def apply_node_parameters(
         self,
-        node_namespace: str,
+        node_path: str,
         param_files: list,
         param_values: list,
         config_registry: Optional["ConfigRegistry"] = None,
@@ -424,7 +431,7 @@ class ParameterManager:
         and param_values directly to it. Parameters will override param_files.
 
         Args:
-            node_namespace: Absolute namespace path to the target node
+            node_path: Absolute namespace path to the target node
                            (e.g., "/perception/object_recognition/node_tracker")
             param_files: List of parameter file mappings
                             (e.g., [{"model_param_path": "path/to/file.yaml"}])
@@ -435,7 +442,7 @@ class ParameterManager:
             direct_parameter_type: ParameterType for directly specified parameters
         """
         # Handle global parameters (root node)
-        if node_namespace == "/":
+        if is_root_namespace(node_path):
             self.apply_parameters_to_all_nodes(
                 param_files,
                 param_values,
@@ -445,13 +452,13 @@ class ParameterManager:
             )
             return
 
-        target_instances = self.find_matching_nodes(node_namespace)
+        target_instances = self.find_matching_nodes(node_path)
         if not target_instances:
-            logger.warning(f"Target node not found: {node_namespace}{format_source(source)}")
+            logger.warning(f"Target node not found: {node_path}{format_source(source)}")
             return
 
         for target_instance in target_instances:
-            logger.info(f"Applying parameters to node: {node_namespace} (instance: {target_instance.name})")
+            logger.info(f"Applying parameters to node: {node_path} (instance: {target_instance.name})")
             self._apply_parameters_to_instance(
                 target_instance,
                 param_files,
@@ -598,33 +605,45 @@ class ParameterManager:
     # Node Finding (helper methods for parameter application)
     # =========================================================================
 
-    def find_matching_nodes(self, target_namespace: str) -> List["Instance"]:
+    def find_matching_nodes(self, target_path: str) -> List["Instance"]:
         """Find all nodes matching the absolute namespace path in the current instance's subtree.
 
         Args:
-            target_namespace: Absolute namespace path (e.g., "/perception/object_recognition/node_tracker")
-
+            target_path: Absolute namespace path or glob pattern
+                (e.g., "/perception/object_recognition/node_tracker", "/*")
         Returns:
             List of matching Instance objects (nodes)
         """
         matches = []
+        has_wildcard = any(ch in target_path for ch in ["*", "?", "["])
+        target_namespace_prefix = resolve_common_namespace_from_paths([target_path]) if has_wildcard else None
+        target_namespace_path = f"/{'/'.join(target_namespace_prefix)}" if target_namespace_prefix else ""
 
         # Helper for recursive search
         def _search(inst):
-            # Check if current instance matches
-            if inst.entity_type == "node" and inst.namespace_str == target_namespace:
-                matches.append(inst)
+
+            if inst.entity_type == "node":
+                if has_wildcard:
+                    if node_group_pattern_matches(target_path, inst.path):
+                        matches.append(inst)
+                elif namespace_paths_equal(inst.path, target_path):
+                    matches.append(inst)
 
             # Optimization: only traverse if target could be deeper
-            # i.e., target_namespace starts with current namespace
+            # i.e., target_path starts with current namespace
             # OR current namespace is root "/"
             # OR current namespace is a prefix of target
 
-            if (
-                inst.namespace_str == "/"
-                or target_namespace.startswith(inst.namespace_str + "/")
-                or inst.namespace_str == target_namespace
-            ):
+            should_traverse = is_root_namespace(inst.path)
+            if not should_traverse:
+                candidate_path = target_namespace_path if has_wildcard else target_path
+                should_traverse = is_root_namespace(candidate_path) or namespace_path_is_descendant(
+                    candidate_path,
+                    inst.path,
+                    include_self=True,
+                )
+
+            if should_traverse:
                 for child in inst.children.values():
                     _search(child)
 
@@ -659,7 +678,7 @@ class ParameterManager:
 
                 if param_name is None or param_value is None:
                     raise ParameterConfigurationError(
-                        f"param_name or param_value is None. namespace: {self.instance.namespace_str}, param_files: {self.instance.configuration.param_files}"
+                        f"param_name or param_value is None. path: {self.instance.path}, param_files: {self.instance.configuration.param_files}"
                     )
 
                 # Resolve parameter file path if resolver is available
@@ -697,7 +716,7 @@ class ParameterManager:
 
                 if param_name is None or param_value is None:
                     raise ParameterConfigurationError(
-                        f"param_name or param_value is None. namespace: {self.instance.namespace_str}, param_values: {self.instance.configuration.param_values}"
+                        f"param_name or param_value is None. path: {self.instance.path}, param_values: {self.instance.configuration.param_values}"
                     )
 
                 # Resolve parameter value if resolver is available
@@ -864,6 +883,11 @@ class ParameterManager:
                 effective_type = parameter_type or (
                     ParameterType.OVERRIDE_FILE if is_override else ParameterType.DEFAULT_FILE
                 )
+
+                # Only default parameter files should be expanded into launcher
+                # param values.
+                if effective_type != ParameterType.DEFAULT_FILE:
+                    continue
 
                 for p_name, p_value in flattened_params.items():
                     if self.parameter_resolver:

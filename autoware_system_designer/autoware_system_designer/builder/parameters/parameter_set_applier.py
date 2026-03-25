@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from ...exceptions import ValidationError
 from ...file_io.source_location import format_source, source_from_config
 from ...models.parsing.data_validator import entity_name_decode
+from ..runtime.namespace import is_root_namespace, namespace_path_is_descendant, resolve_common_namespace_from_paths
 from ..runtime.parameters import ParameterType
 
 if TYPE_CHECKING:
@@ -11,6 +12,15 @@ if TYPE_CHECKING:
     from ..instances.instances import Instance
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_parameter_target_namespace(node_target: str) -> str:
+    """Resolve the static namespace prefix used to scope a parameter-set node target."""
+    if any(ch in node_target for ch in ["*", "?", "["]):
+        target_namespace = resolve_common_namespace_from_paths([node_target])
+        return f"/{'/'.join(target_namespace)}" if target_namespace else ""
+
+    return node_target
 
 
 def apply_parameter_set(
@@ -81,14 +91,28 @@ def apply_parameter_set(
                     node_namespace = param_config.get("node")
                     node_source = source_from_config(cfg_param_set, f"/parameters/{node_idx}/node")
 
-                    # Only apply if the target node is under this component's namespace
-                    if (
-                        check_namespace
-                        and node_namespace != target_instance.namespace_str
-                        and not node_namespace.startswith(target_instance.namespace_str + "/")
+                    target_namespace = _resolve_parameter_target_namespace(node_namespace)
+
+                    # Only apply if the target node or wildcard prefix is under this component's namespace
+                    if check_namespace and not (
+                        is_root_namespace(target_namespace)
+                        or namespace_path_is_descendant(
+                            target_namespace,
+                            target_instance.resolved_path,
+                            include_self=True,
+                        )
                     ):
                         logger.debug(
-                            f"Parameter set '{param_set_name}' skip node '{node_namespace}' (component namespace '{target_instance.namespace_str}')"
+                            f"Parameter set '{param_set_name}' skip node '{node_namespace}' (component path '{target_instance.path}')"
+                        )
+                        continue
+
+                    # Pre-check: verify the target node actually exists in this
+                    # component's instance subtree.
+                    if not target_instance.parameter_manager.find_matching_nodes(node_namespace):
+                        logger.debug(
+                            f"Parameter set '{param_set_name}' skip node '{node_namespace}' "
+                            f"(not in '{target_instance.name}' subtree)"
                         )
                         continue
 

@@ -23,6 +23,7 @@ from ..config.launch_manager import LaunchManager
 from ..graph.event_manager import EventManager
 from ..graph.link_manager import LinkManager
 from ..parameters.parameter_manager import ParameterManager
+from ..runtime.namespace import Namespace
 from .instance_serializer import (
     collect_instance_data,
     collect_system_structure,
@@ -36,11 +37,12 @@ class Instance:
     Manages configuration, topology, interfaces, parameters, and events.
     """
 
-    def __init__(self, name: str, compute_unit: str = "", namespace: list[str] = [], layer: int = 0):
+    def __init__(
+        self, name: str, compute_unit: str = "", namespace: list[str] | Namespace | None = None, layer: int = 0
+    ):
         self.name: str = name
-        self.namespace: List[str] = namespace.copy()
-        # add the instance name to the namespace
-        self.namespace_str: str = "/" + "/".join(self.namespace)
+        self.namespace: Namespace = Namespace(namespace)
+        self.resolved_path = Namespace(list(self.namespace) + [self.name])
 
         self.compute_unit: str = compute_unit
         self.layer: int = layer
@@ -71,6 +73,19 @@ class Instance:
         # event manager
         self.event_manager: EventManager = EventManager(self)
 
+    def set_resolved_path(self, resolved_path: list[str] | Namespace) -> None:
+        """Set resolved path and synchronize exported port namespace."""
+        self.resolved_path = Namespace(resolved_path)
+
+    @property
+    def port_namespace(self) -> Namespace:
+        """Get the namespace to be used for port naming."""
+        return self.resolved_path
+
+    @property
+    def path_list(self) -> List:
+        return list(self.resolved_path)
+
     def set_parameter_resolver(self, parameter_resolver):
         """Set the parameter resolver for this instance and propagate to parameter manager."""
         self.parameter_resolver = parameter_resolver
@@ -85,26 +100,35 @@ class Instance:
         self.is_initialized = False
 
     @property
+    def path(self) -> str:
+        """Get the full path of this instance in the hierarchy."""
+        if self.entity_type == "system":
+            return "/"
+
+        resolved = self.resolved_path.to_string()
+        return resolved if resolved else "/"
+
+    @property
     def unique_id(self):
-        return generate_unique_id(self.namespace, "instance", self.compute_unit, self.layer, self.name)
+        return generate_unique_id(self.path, "instance", self.compute_unit, self.layer, self.name)
 
     @property
     def vis_guide(self) -> dict:
         """Get visualization guide including colors."""
         return {
-            "color": get_component_color(self.namespace, variant="base"),
-            "medium_color": get_component_color(self.namespace, variant="medium"),
-            "background_color": get_component_color(self.namespace, variant="bright"),
-            "text_color": get_component_color(self.namespace, variant="darkest"),
-            "dark_color": get_component_color(self.namespace, variant="fade"),
+            "color": get_component_color(self.path_list, variant="base"),
+            "medium_color": get_component_color(self.path_list, variant="medium"),
+            "background_color": get_component_color(self.path_list, variant="bright"),
+            "text_color": get_component_color(self.path_list, variant="darkest"),
+            "dark_color": get_component_color(self.path_list, variant="fade"),
             "dark_medium_color": get_component_color(
-                self.namespace, variant="darkish"
+                self.path_list, variant="darkish"
             ),  # Integrated dark+text variant for nodes
             "dark_background_color": get_component_color(
-                self.namespace, variant="dark"
+                self.path_list, variant="dark"
             ),  # Pure dark variant for modules
-            "dark_text_color": get_component_color(self.namespace, variant="bright"),
-            "position": get_component_position(self.namespace),
+            "dark_text_color": get_component_color(self.path_list, variant="bright"),
+            "position": get_component_position(self.path_list),
         }
 
     def get_child(self, name: str):
