@@ -8,6 +8,7 @@ from ...models.system_structure import (
     PortData,
     SystemStructurePayload,
 )
+from ...file_io.source_location import SourceLocation
 
 if TYPE_CHECKING:
     from .instances import Instance
@@ -60,6 +61,18 @@ def serialize_parameter_type(param_type) -> str:
     return str(param_type)
 
 
+def serialize_source(source: SourceLocation | None) -> Dict[str, Any] | None:
+    if source is None:
+        return None
+
+    return {
+        "file_path": str(source.file_path) if source.file_path is not None else None,
+        "yaml_path": source.yaml_path,
+        "line": source.line,
+        "column": source.column,
+    }
+
+
 def collect_launcher_data(instance: "Instance") -> Dict[str, Any]:
     """Collect node data required for launcher generation."""
     if instance.entity_type != "node":
@@ -108,6 +121,7 @@ def collect_instance_data(instance: "Instance") -> InstanceData:
                 "value": p.value,
                 "type": p.data_type,
                 "parameter_type": serialize_parameter_type(p.parameter_type),
+                "source": serialize_source(p.source),
             }
             for p in instance.parameter_manager.get_all_parameters()
         ],
@@ -122,6 +136,7 @@ def collect_instance_data(instance: "Instance") -> InstanceData:
                 "allow_substs": pf.allow_substs,
                 "is_override": pf.is_override,
                 "parameter_type": serialize_parameter_type(pf.parameter_type),
+                "source": serialize_source(pf.source),
             }
             for pf in instance.parameter_manager.get_all_parameter_files()
         ]
