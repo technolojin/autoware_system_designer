@@ -878,7 +878,9 @@ class ParameterManager:
                 return
 
             flattened_params = self._flatten_parameters(ros_params)
-            effective_type = parameter_type or (ParameterType.OVERRIDE_FILE if is_override else ParameterType.DEFAULT_FILE)
+            effective_type = parameter_type or (
+                ParameterType.OVERRIDE_FILE if is_override else ParameterType.DEFAULT_FILE
+            )
 
             if effective_type not in (ParameterType.DEFAULT_FILE, ParameterType.OVERRIDE_FILE, ParameterType.MODE_FILE):
                 return
