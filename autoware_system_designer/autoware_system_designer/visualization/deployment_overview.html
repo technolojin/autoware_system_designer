@@ -237,6 +237,34 @@
         // --- 3. Parameter Block ---
         const params = data.parameters;
         if (!isEmpty(params)) {
+          // Source type → { label, text color, bg rgba, border rgba }
+          const paramTypeStyle = {
+            DEFAULT:       { label: "default",   color: "#888888", bg: "rgba(136,136,136,0.12)", border: "rgba(136,136,136,0.35)" },
+            DEFAULT_FILE:  { label: "def-file",  color: "#888888", bg: "rgba(136,136,136,0.12)", border: "rgba(136,136,136,0.35)" },
+            OVERRIDE:      { label: "override",  color: "#d4890a", bg: "rgba(212,137,10,0.12)",  border: "rgba(212,137,10,0.40)"  },
+            OVERRIDE_FILE: { label: "ovr-file",  color: "#d4890a", bg: "rgba(212,137,10,0.12)",  border: "rgba(212,137,10,0.40)"  },
+            MODE:          { label: "mode",      color: "#1e88e5", bg: "rgba(30,136,229,0.12)",  border: "rgba(30,136,229,0.40)"  },
+            MODE_FILE:     { label: "mode-file", color: "#1e88e5", bg: "rgba(30,136,229,0.12)",  border: "rgba(30,136,229,0.40)"  },
+            GLOBAL:        { label: "global",    color: "#8e24aa", bg: "rgba(142,36,170,0.12)",  border: "rgba(142,36,170,0.40)"  },
+          };
+
+          function buildSourceBadge(ptype, source) {
+            const style = paramTypeStyle[ptype] || { label: (ptype || "").toLowerCase() || "—", color: "#888", bg: "rgba(136,136,136,0.12)", border: "rgba(136,136,136,0.35)" };
+            const badgeStyle = `display:inline-block;font-size:10px;font-weight:600;` +
+              `color:${style.color};background:${style.bg};border:1px solid ${style.border};` +
+              `border-radius:3px;padding:1px 5px;font-family:'Consolas',monospace;` +
+              `vertical-align:middle;white-space:nowrap;`;
+
+            if (source && source.file_path) {
+              const fp = source.file_path;
+              const line = source.line || 1;
+              const vsUrl = `vscode://file/${fp}:${line}`;
+              // Title shows full path for hover tooltip; href uses vscode:// protocol
+              return `<a href="${vsUrl}" title="${fp}:${line}" style="${badgeStyle}cursor:pointer;text-decoration:none;">${style.label}</a>`;
+            }
+            return `<span style="${badgeStyle}" title="${ptype}">${style.label}</span>`;
+          }
+
           let parameterHtml = `<div>`;
 
           if (typeof params === "object" && !Array.isArray(params)) {
@@ -254,16 +282,22 @@
               if (typeof displayVal === "object")
                 displayVal = JSON.stringify(displayVal);
 
-              parameterHtml += `<div style="padding: 6px 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: flex-start;">
-                              <div style="font-size: 12px; font-weight: 500; color: var(--text-secondary); word-break: break-all; margin-right: 10px; flex: 1;">${p.name}</div>
-                              <div style="font-family: 'Consolas', monospace; font-size: 12px; color: var(--text-primary); word-break: break-all; text-align: right; flex: 1;">${displayVal}</div>
+              const badge = buildSourceBadge(p.parameter_type, p.source);
+
+              parameterHtml += `<div style="padding: 6px 0; border-bottom: 1px solid var(--border-color);">
+                              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:2px;">
+                                <span style="font-size:12px;font-weight:500;color:var(--text-secondary);word-break:break-all;flex:1;">${p.name} ${badge}</span>
+                                <span style="font-family:'Consolas',monospace;font-size:12px;color:var(--text-primary);word-break:break-all;text-align:right;flex-shrink:0;">${displayVal}</span>
+                              </div>
                           </div>`;
             });
           }
           parameterHtml += `</div>`;
 
           html += `<div class="info-card">
-                    <div class="info-title">Parameter</div>
+                    <div class="info-title">Parameter
+                      <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px;" title="Badges link to the source file in VS Code (vscode:// protocol). If clicking does nothing, see the path on hover and open it manually.">badges → VS Code</span>
+                    </div>
                     ${parameterHtml}
                 </div>`;
         }
