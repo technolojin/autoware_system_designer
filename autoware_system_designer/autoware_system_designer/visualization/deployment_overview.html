@@ -33,7 +33,7 @@
       </div>
 
       <div id="mode-selector-section">
-        <label for="mode-selector">View Mode:</label>
+        <label for="mode-selector">System Mode:</label>
         <select id="mode-selector">
           <!-- Populated by JS -->
         </select>
@@ -142,9 +142,17 @@
         return urlParams.get(name);
       }
 
-      // State
+      // Sync selection state to URL without triggering a reload
+      function updateUrlParams() {
+        const url = new URL(window.location.href);
+        url.searchParams.set("diagram", currentDiagramType);
+        url.searchParams.set("mode", currentMode);
+        history.replaceState(null, "", url.toString());
+      }
+
+      // State — restored from URL params when present
       let currentDiagramType = getUrlParameter("diagram") || defaultDiagramType;
-      let currentMode = defaultMode;
+      let currentMode = getUrlParameter("mode") || defaultMode;
       let currentDiagramData = null;
       let nodeDiagramInstance = null;
       let sequenceDiagramInstance = null;
@@ -505,9 +513,10 @@
           const option = document.createElement("option");
           option.value = mode;
           option.textContent = mode;
-          if (mode === defaultMode) option.selected = true;
           modeSelect.appendChild(option);
         });
+        // Restore selection from URL (currentMode already accounts for URL param)
+        modeSelect.value = currentMode;
 
         // Populate diagram types
         const diagramList = document.getElementById("diagram-list");
@@ -531,6 +540,7 @@
           item.addEventListener("click", (e) => {
             e.preventDefault();
             currentDiagramType = item.getAttribute("data-type");
+            updateUrlParams();
             updateDiagramTypeSelection();
             loadDiagram(currentDiagramType, currentMode);
           });
@@ -539,6 +549,7 @@
         // Mode selector event listener
         modeSelect.addEventListener("change", (e) => {
           currentMode = e.target.value;
+          updateUrlParams();
           loadDiagram(currentDiagramType, currentMode);
         });
 
@@ -627,6 +638,9 @@
       window.addEventListener("load", () => {
         // Initialize UI from config
         initializeUI();
+
+        // Write initial URL params so the current state is preserved on refresh
+        updateUrlParams();
 
         // Initialize theme (uses localStorage so mode persists across pages)
         window.initializeTheme();
