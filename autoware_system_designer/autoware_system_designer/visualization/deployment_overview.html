@@ -5,9 +5,21 @@
     <title>Autoware System Designer</title>
     <script src="config.js"></script>
     <script src="diagram_base.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/elkjs@0.9.3/lib/elk.bundled.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/elkjs@0.9.3/lib/elk.bundled.js"
+      integrity="sha384-KO35c6PFq7tFxAEx6FtATwL9vOBOmCzQYr7GM0iTr3oO22s7Jc9OkclOH4AV7jwK"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"
+      integrity="sha384-WmdflGW9aGfoBdHc4rRyWzYuAjEmDwMdGdiPNacbwfGKxBW/SO6guzuQ76qjnSlr"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"
+      integrity="sha384-yc/c2Lk1s2V2ir1rxvjo8YyVD9PlOlYTqpNr3Wm1WIuAA30GlDYNx6U5104OiavY"
+      crossorigin="anonymous"
+    ></script>
     <link rel="stylesheet" href="css/styles.css" />
     <script src="theme.js"></script>
   </head>
@@ -25,14 +37,25 @@
         <a href="#" class="launcher-link" id="launcher-link">Launch commands</a>
         <h1></h1>
         <div class="package-info"></div>
-        <div class="dark-mode-toggle">
-          <label for="dark-mode-switch">Dark Mode</label>
-          <div class="toggle-switch" id="dark-mode-switch"></div>
-        </div>
+        <button id="settings-btn" title="Settings" aria-label="Open settings">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
       </div>
 
       <div id="mode-selector-section">
-        <label for="mode-selector">View Mode:</label>
+        <label for="mode-selector">System Mode:</label>
         <select id="mode-selector">
           <!-- Populated by JS -->
         </select>
@@ -45,6 +68,40 @@
 
       <div id="info-panel">
         <!-- Node details will be populated here -->
+      </div>
+    </div>
+
+    <!-- Settings Popup -->
+    <div id="settings-overlay"></div>
+    <div
+      id="settings-popup"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Settings"
+    >
+      <div id="settings-popup-header">
+        <span>Settings</span>
+        <button id="settings-close" aria-label="Close settings">
+          &#x2715;
+        </button>
+      </div>
+      <div class="settings-row">
+        <label for="dark-mode-switch">Dark Mode</label>
+        <div class="toggle-switch" id="dark-mode-switch"></div>
+      </div>
+      <div class="settings-row">
+        <label for="editor-selector">Editor</label>
+        <select id="editor-selector">
+          <option value="vscode">VS Code</option>
+          <option value="vscode-insiders">VS Code Insiders</option>
+          <option value="cursor">Cursor</option>
+          <option value="windsurf">Windsurf</option>
+          <option value="idea">IntelliJ IDEA</option>
+          <option value="clion">CLion</option>
+          <option value="pycharm">PyCharm</option>
+          <option value="webstorm">WebStorm</option>
+          <option value="subl">Sublime Text</option>
+        </select>
       </div>
     </div>
 
@@ -75,7 +132,29 @@
         defaultMode,
         packageName,
         systemsIndexPath,
+        editorScheme: defaultEditorScheme = "vscode",
+        systemDefinitionFile = "",
       } = deploymentConfig;
+
+      // --- Editor URL helper ---
+      // Reads preference from localStorage (set by editor selector in sidebar).
+      // Falls back to deploymentConfig.editorScheme, then "vscode".
+      function getEditorUrl(fp, line) {
+        const scheme =
+          localStorage.getItem("editorScheme") || defaultEditorScheme;
+        switch (scheme) {
+          case "idea":
+          case "clion":
+          case "pycharm":
+          case "webstorm":
+            return `${scheme}://open?file=${encodeURIComponent(fp)}&line=${line}`;
+          case "subl":
+            return `subl://open?url=file://${encodeURIComponent(fp)}&line=${line}`;
+          default:
+            // vscode, vscode-insiders, cursor, windsurf — all share the same scheme
+            return `${scheme}://file/${encodeURIComponent(fp)}:${line}`;
+        }
+      }
 
       // Optional callback for diagram modules when theme changes (set by theme.js)
       window.__onThemeChange = function () {
@@ -93,9 +172,17 @@
         return urlParams.get(name);
       }
 
-      // State
+      // Sync selection state to URL without triggering a reload
+      function updateUrlParams() {
+        const url = new URL(window.location.href);
+        url.searchParams.set("diagram", currentDiagramType);
+        url.searchParams.set("mode", currentMode);
+        history.replaceState(null, "", url.toString());
+      }
+
+      // State — restored from URL params when present
       let currentDiagramType = getUrlParameter("diagram") || defaultDiagramType;
-      let currentMode = defaultMode;
+      let currentMode = getUrlParameter("mode") || defaultMode;
       let currentDiagramData = null;
       let nodeDiagramInstance = null;
       let sequenceDiagramInstance = null;
@@ -145,6 +232,8 @@
                 </div>`;
         }
 
+        // --- Source File Block --- (built via DOM API to avoid HTML injection)
+
         // --- 1. Info Block ---
         let infoHtml = "";
         // Fields explicitly excluded from Info block or handled in other blocks
@@ -162,6 +251,7 @@
           "target",
           "sections",
           "vis_guide",
+          "source_file",
           "in_ports",
           "out_ports",
           "parameters",
@@ -237,6 +327,83 @@
         // --- 3. Parameter Block ---
         const params = data.parameters;
         if (!isEmpty(params)) {
+          // Source type → { label, text color, bg rgba, border rgba }
+          const paramTypeStyle = {
+            DEFAULT: {
+              label: "default",
+              color: "#888888",
+              bg: "rgba(136,136,136,0.12)",
+              border: "rgba(136,136,136,0.35)",
+            },
+            DEFAULT_FILE: {
+              label: "def-file",
+              color: "#888888",
+              bg: "rgba(136,136,136,0.12)",
+              border: "rgba(136,136,136,0.35)",
+            },
+            OVERRIDE: {
+              label: "override",
+              color: "#d4890a",
+              bg: "rgba(212,137,10,0.12)",
+              border: "rgba(212,137,10,0.40)",
+            },
+            OVERRIDE_FILE: {
+              label: "ovr-file",
+              color: "#d4890a",
+              bg: "rgba(212,137,10,0.12)",
+              border: "rgba(212,137,10,0.40)",
+            },
+            MODE: {
+              label: "mode",
+              color: "#1e88e5",
+              bg: "rgba(30,136,229,0.12)",
+              border: "rgba(30,136,229,0.40)",
+            },
+            MODE_FILE: {
+              label: "mode-file",
+              color: "#1e88e5",
+              bg: "rgba(30,136,229,0.12)",
+              border: "rgba(30,136,229,0.40)",
+            },
+            GLOBAL: {
+              label: "global",
+              color: "#8e24aa",
+              bg: "rgba(142,36,170,0.12)",
+              border: "rgba(142,36,170,0.40)",
+            },
+          };
+
+          function escapeHtml(str) {
+            return String(str)
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#39;");
+          }
+
+          function buildSourceBadge(ptype, source) {
+            const style = paramTypeStyle[ptype] || {
+              label: (ptype || "").toLowerCase() || "—",
+              color: "#888",
+              bg: "rgba(136,136,136,0.12)",
+              border: "rgba(136,136,136,0.35)",
+            };
+            const badgeStyle =
+              `display:inline-block;font-size:10px;font-weight:600;` +
+              `color:${style.color};background:${style.bg};border:1px solid ${style.border};` +
+              `border-radius:3px;padding:1px 5px;font-family:'Consolas',monospace;` +
+              `vertical-align:middle;white-space:nowrap;`;
+
+            if (source && source.file_path) {
+              const fp = source.file_path;
+              const line = source.line || 1;
+              const editorUrl = getEditorUrl(fp, line);
+              return `<a href="${editorUrl}" title="${escapeHtml(fp)}:${escapeHtml(line)}" style="${badgeStyle}cursor:pointer;text-decoration:none;">${escapeHtml(style.label)}</a>`;
+            }
+            return `<span style="${badgeStyle}" title="${escapeHtml(ptype)}">${escapeHtml(style.label)}</span>`;
+          }
+
           let parameterHtml = `<div>`;
 
           if (typeof params === "object" && !Array.isArray(params)) {
@@ -244,8 +411,8 @@
               let displayVal = pVal;
               if (typeof pVal === "object") displayVal = JSON.stringify(pVal);
               parameterHtml += `<div style="padding: 6px 0; border-bottom: 1px solid var(--border-color);">
-                            <div style="font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 2px; word-break: break-all;">${pName}</div>
-                            <div style="font-family: 'Consolas', monospace; font-size: 12px; color: var(--text-primary); word-break: break-all; padding-left: 8px;">${displayVal}</div>
+                            <div style="font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 2px; word-break: break-all;">${escapeHtml(pName)}</div>
+                            <div style="font-family: 'Consolas', monospace; font-size: 12px; color: var(--text-primary); word-break: break-all; padding-left: 8px;">${escapeHtml(String(displayVal))}</div>
                         </div>`;
             }
           } else if (Array.isArray(params)) {
@@ -254,9 +421,13 @@
               if (typeof displayVal === "object")
                 displayVal = JSON.stringify(displayVal);
 
-              parameterHtml += `<div style="padding: 6px 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: flex-start;">
-                              <div style="font-size: 12px; font-weight: 500; color: var(--text-secondary); word-break: break-all; margin-right: 10px; flex: 1;">${p.name}</div>
-                              <div style="font-family: 'Consolas', monospace; font-size: 12px; color: var(--text-primary); word-break: break-all; text-align: right; flex: 1;">${displayVal}</div>
+              const badge = buildSourceBadge(p.parameter_type, p.source);
+
+              parameterHtml += `<div style="padding: 6px 0; border-bottom: 1px solid var(--border-color);">
+                              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:2px;">
+                                <span style="font-size:12px;font-weight:500;color:var(--text-secondary);word-break:break-all;flex:1;">${escapeHtml(p.name)} ${badge}</span>
+                                <span style="font-family:'Consolas',monospace;font-size:12px;color:var(--text-primary);word-break:break-all;text-align:right;flex-shrink:0;">${escapeHtml(String(displayVal))}</span>
+                              </div>
                           </div>`;
             });
           }
@@ -274,6 +445,34 @@
         }
 
         infoPanel.innerHTML = html;
+
+        if (data.source_file) {
+          const fp = data.source_file;
+          const shortName = fp.split("/").pop();
+          const editorUrl = getEditorUrl(fp, 1);
+
+          const a = document.createElement("a");
+          a.setAttribute("href", editorUrl);
+          a.setAttribute("title", fp);
+          a.style.cssText =
+            "color:var(--link-color,#1e88e5);text-decoration:none;word-break:break-all;font-size:13px;font-family:'Consolas',monospace;";
+          a.textContent = shortName;
+
+          const row = document.createElement("div");
+          row.className = "info-row";
+          row.appendChild(a);
+
+          const titleEl = document.createElement("div");
+          titleEl.className = "info-title";
+          titleEl.textContent = "Source";
+
+          const card = document.createElement("div");
+          card.className = "info-card";
+          card.appendChild(titleEl);
+          card.appendChild(row);
+
+          infoPanel.insertBefore(card, infoPanel.firstChild);
+        }
       }
 
       function updateDiagramTypeSelection() {
@@ -414,8 +613,20 @@
         if (headerTitle) headerTitle.textContent = deploymentName;
 
         const packageInfoDiv = document.querySelector(".package-info");
-        if (packageInfoDiv)
+        if (packageInfoDiv) {
           packageInfoDiv.textContent = `Package: ${packageName}`;
+          if (systemDefinitionFile) {
+            const editorUrl = getEditorUrl(systemDefinitionFile, 1);
+            const shortName = systemDefinitionFile.split("/").pop();
+            const link = document.createElement("a");
+            link.href = editorUrl;
+            link.title = systemDefinitionFile;
+            link.textContent = shortName;
+            link.style.cssText =
+              "display:block;font-size:12px;color:var(--link-color,#1e88e5);text-decoration:none;word-break:break-all;font-family:'Consolas',monospace;margin-top:2px;";
+            packageInfoDiv.appendChild(link);
+          }
+        }
 
         // Populate mode selector
         modeSelect.innerHTML = "";
@@ -423,9 +634,10 @@
           const option = document.createElement("option");
           option.value = mode;
           option.textContent = mode;
-          if (mode === defaultMode) option.selected = true;
           modeSelect.appendChild(option);
         });
+        // Restore selection from URL (currentMode already accounts for URL param)
+        modeSelect.value = currentMode;
 
         // Populate diagram types
         const diagramList = document.getElementById("diagram-list");
@@ -449,6 +661,7 @@
           item.addEventListener("click", (e) => {
             e.preventDefault();
             currentDiagramType = item.getAttribute("data-type");
+            updateUrlParams();
             updateDiagramTypeSelection();
             loadDiagram(currentDiagramType, currentMode);
           });
@@ -457,13 +670,47 @@
         // Mode selector event listener
         modeSelect.addEventListener("change", (e) => {
           currentMode = e.target.value;
+          updateUrlParams();
           loadDiagram(currentDiagramType, currentMode);
         });
+
+        // Editor selector — persists choice in localStorage
+        const editorSelect = document.getElementById("editor-selector");
+        const savedScheme =
+          localStorage.getItem("editorScheme") || defaultEditorScheme;
+        if (editorSelect) {
+          editorSelect.value = savedScheme;
+          editorSelect.addEventListener("change", (e) => {
+            localStorage.setItem("editorScheme", e.target.value);
+          });
+        }
       }
 
       // Dark mode listener (theme.js provides toggleDarkMode)
       darkModeToggle.addEventListener("click", function () {
         window.toggleDarkMode();
+      });
+
+      // Settings popup
+      const settingsBtn = document.getElementById("settings-btn");
+      const settingsOverlay = document.getElementById("settings-overlay");
+      const settingsPopup = document.getElementById("settings-popup");
+      const settingsClose = document.getElementById("settings-close");
+
+      function openSettings() {
+        settingsPopup.classList.add("open");
+        settingsOverlay.classList.add("open");
+      }
+      function closeSettings() {
+        settingsPopup.classList.remove("open");
+        settingsOverlay.classList.remove("open");
+      }
+
+      settingsBtn.addEventListener("click", openSettings);
+      settingsClose.addEventListener("click", closeSettings);
+      settingsOverlay.addEventListener("click", closeSettings);
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeSettings();
       });
 
       // Resizer functionality
@@ -512,6 +759,9 @@
       window.addEventListener("load", () => {
         // Initialize UI from config
         initializeUI();
+
+        // Write initial URL params so the current state is preserved on refresh
+        updateUrlParams();
 
         // Initialize theme (uses localStorage so mode persists across pages)
         window.initializeTheme();
