@@ -152,7 +152,7 @@
             return `subl://open?url=file://${encodeURIComponent(fp)}&line=${line}`;
           default:
             // vscode, vscode-insiders, cursor, windsurf — all share the same scheme
-            return `${scheme}://file/${fp}:${line}`;
+            return `${scheme}://file/${encodeURIComponent(fp)}:${line}`;
         }
       }
 
