@@ -1,0 +1,27 @@
+autoware_system_design_format: 0.4.0
+
+name: ServiceOnly.node
+
+description: Dummy node exposing only a service server.
+
+package:
+  name: kind_pkg
+  provider: dummy
+
+launch:
+  plugin: kind::ServiceOnly
+  executable: service_only_node
+  node_output: screen
+
+subscribers: []
+
+publishers: []
+
+servers:
+  - name: set_mode
+    message_type: std_srvs/srv/SetBool
+
+param_files: []
+param_values: []
+
+processes: []

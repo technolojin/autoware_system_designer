@@ -120,7 +120,7 @@ Represents a composite component containing nodes or other modules.
 - `clients`: (Optional) List of externally accessible service/action clients.
   - `name`: Client name.
   - `description`: (Optional) Brief explanation of the client.
-- `connections`: Internal wiring. List of connection pairs, where each connection is a list of two port paths. Supports wildcards (e.g., `subscriber.*` or `node.publisher.*`). Connection entries do not take a `description`.
+- `connections`: Internal wiring. List of connection pairs, where each connection is a list of two port paths. Supports wildcards (e.g., `subscriber.*` or `node.publisher.*`); a wildcard matches only ports of the declared kind, so `publisher.*` and `server.*` lines pair independent port sets. Connection entries do not take a `description`.
 
 **Connection Syntax:**
 
@@ -205,7 +205,7 @@ Top-level entry point defining the complete system.
   - `name`: Unique group name. It will be used as the component name for the container.
   - `type`: Node group execution type. select `ros2_component_container_mt` or `ros2_component_container`.
   - `nodes`: List of non-empty path patterns. Glob patterns (`*`, `?`, `[...]`) match the full node path.
-- `connections`: Top-level wiring between components. List of connection pairs, where each connection is a list of two port paths. Supports wildcards (e.g., `component.publisher.^` for wildcard). Connection entries do not take a `description`.
+- `connections`: Top-level wiring between components. List of connection pairs, where each connection is a list of two port paths. Supports wildcards (e.g., `component.publisher.^` for wildcard); a wildcard matches only ports of the declared kind. Connection entries do not take a `description`.
 
 **Mode-Specific Overrides:**
 Each mode can define overrides using the mode name as a key:

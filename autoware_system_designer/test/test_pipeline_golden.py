@@ -34,6 +34,7 @@ from pipeline_harness import (
 CASES = {
     "single_node": ("demo_pkg/Solo.system.yaml", ["default"]),
     "module_pipeline": ("pipeline_pkg/Chain.system.yaml", ["default"]),
+    "module_services": ("services_pkg/Hub.system.yaml", ["default"]),
     "modes_variant": ("variant_pkg/VehicleY.system.yaml", ["default", "simulation"]),
     "parameter_sets": ("tuned_pkg/Tuned.system.yaml", ["default"]),
     "launch_wrapper": ("wrapper_pkg/Wrapped.system.yaml", ["default"]),
@@ -52,6 +53,10 @@ TEXT_ARTIFACTS = {
     "module_pipeline": [
         "launcher/{mode}/main_ecu/main_ecu.launch.xml",
         "launcher/{mode}/main_ecu/pipeline/pipeline.launch.xml",
+    ],
+    "module_services": [
+        "launcher/{mode}/main_ecu/main_ecu.launch.xml",
+        "launcher/{mode}/main_ecu/api/api.launch.xml",
     ],
     "launch_wrapper": ["launcher/{mode}/main_ecu/map/map.launch.xml"],
 }

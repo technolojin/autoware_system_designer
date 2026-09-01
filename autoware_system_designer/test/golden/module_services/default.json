@@ -1,0 +1,1304 @@
+{
+  "data": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [],
+            "compute_unit": "main_ecu",
+            "entity_type": "node",
+            "events": [
+              {
+                "action_ids": [
+                  "id_ba3f3b9a856b0a9b"
+                ],
+                "error_rate": null,
+                "frequency": null,
+                "name": "report",
+                "process_event": true,
+                "timeout": null,
+                "trigger_ids": [],
+                "type": "or",
+                "unique_id": "id_626f2493bf938b50",
+                "warn_rate": null
+              }
+            ],
+            "in_ports": [],
+            "launcher": {
+              "args": "",
+              "executable": "provider_node",
+              "launch_state": "single_node",
+              "node_output": "screen",
+              "package": "services_pkg",
+              "param_files": [],
+              "param_values": [],
+              "ports": [
+                {
+                  "name": "status",
+                  "remap_target": "~/output/status",
+                  "topic": "/api/status"
+                },
+                {
+                  "name": "set_mode",
+                  "remap_target": "~/output/set_mode",
+                  "topic": "/api/set_mode"
+                },
+                {
+                  "name": "reset",
+                  "remap_target": "~/output/reset",
+                  "topic": "/api/reset"
+                }
+              ]
+            },
+            "links": [],
+            "name": "provider",
+            "namespace": "/api",
+            "out_ports": [
+              {
+                "connected_ids": [
+                  "id_5f58bfa9a6854ab8",
+                  "id_4a79de18e4f9eb20"
+                ],
+                "event": {
+                  "action_ids": [
+                    "id_5f58bfa9a6854ab8",
+                    "id_4a79de18e4f9eb20"
+                  ],
+                  "error_rate": null,
+                  "frequency": null,
+                  "name": "output_status",
+                  "process_event": false,
+                  "timeout": null,
+                  "trigger_ids": [
+                    "id_626f2493bf938b50"
+                  ],
+                  "type": "to_output",
+                  "unique_id": "id_ba3f3b9a856b0a9b",
+                  "warn_rate": null
+                },
+                "is_global": false,
+                "is_outward": true,
+                "is_remapped": false,
+                "msg_type": "std_msgs/msg/String",
+                "name": "status",
+                "namespace": [
+                  "api",
+                  "provider"
+                ],
+                "port_path": "/api/provider/output/status",
+                "remap_target": "~/output/status",
+                "topic": [
+                  "api",
+                  "status"
+                ],
+                "unique_id": "id_ba3f3b9a856b0a9b"
+              },
+              {
+                "connected_ids": [
+                  "id_cba889a22f44c1d7",
+                  "id_ff3c5abe0a5ff8b4"
+                ],
+                "event": {
+                  "action_ids": [
+                    "id_cba889a22f44c1d7",
+                    "id_ff3c5abe0a5ff8b4"
+                  ],
+                  "error_rate": null,
+                  "frequency": null,
+                  "name": "output_set_mode",
+                  "process_event": false,
+                  "timeout": null,
+                  "trigger_ids": [],
+                  "type": "to_output",
+                  "unique_id": "id_3c5169a9ffdd939d",
+                  "warn_rate": null
+                },
+                "is_global": false,
+                "is_outward": true,
+                "is_remapped": false,
+                "msg_type": "std_srvs/srv/SetBool",
+                "name": "set_mode",
+                "namespace": [
+                  "api",
+                  "provider"
+                ],
+                "port_path": "/api/provider/output/set_mode",
+                "remap_target": "~/output/set_mode",
+                "topic": [
+                  "api",
+                  "set_mode"
+                ],
+                "unique_id": "id_3c5169a9ffdd939d"
+              },
+              {
+                "connected_ids": [
+                  "id_cd63ec35f995fecc",
+                  "id_43a940fd98d50ec8"
+                ],
+                "event": {
+                  "action_ids": [
+                    "id_cd63ec35f995fecc",
+                    "id_43a940fd98d50ec8"
+                  ],
+                  "error_rate": null,
+                  "frequency": null,
+                  "name": "output_reset",
+                  "process_event": false,
+                  "timeout": null,
+                  "trigger_ids": [],
+                  "type": "to_output",
+                  "unique_id": "id_0af2f1410d28129f",
+                  "warn_rate": null
+                },
+                "is_global": false,
+                "is_outward": true,
+                "is_remapped": false,
+                "msg_type": "std_srvs/srv/Trigger",
+                "name": "reset",
+                "namespace": [
+                  "api",
+                  "provider"
+                ],
+                "port_path": "/api/provider/output/reset",
+                "remap_target": "~/output/reset",
+                "topic": [
+                  "api",
+                  "reset"
+                ],
+                "unique_id": "id_0af2f1410d28129f"
+              }
+            ],
+            "package": "services_pkg",
+            "parameter_files_all": [],
+            "parameters": [],
+            "path": "/api/provider",
+            "source_file": "${workspace_root}/ws/services_pkg/Provider.node.yaml",
+            "unique_id": "id_86b888c89e24bee6"
+          },
+          {
+            "children": [],
+            "compute_unit": "main_ecu",
+            "entity_type": "node",
+            "events": [
+              {
+                "action_ids": [],
+                "error_rate": null,
+                "frequency": null,
+                "name": "watch",
+                "process_event": true,
+                "timeout": null,
+                "trigger_ids": [
+                  "id_5f58bfa9a6854ab8"
+                ],
+                "type": "on_input",
+                "unique_id": "id_40d7e75954b54160",
+                "warn_rate": null
+              }
+            ],
+            "in_ports": [
+              {
+                "connected_ids": [
+                  "id_ba3f3b9a856b0a9b"
+                ],
+                "event": {
+                  "action_ids": [
+                    "id_40d7e75954b54160"
+                  ],
+                  "error_rate": null,
+                  "frequency": null,
+                  "name": "input_status",
+                  "process_event": false,
+                  "timeout": null,
+                  "trigger_ids": [
+                    "id_ba3f3b9a856b0a9b"
+                  ],
+                  "type": "on_input",
+                  "unique_id": "id_5f58bfa9a6854ab8",
+                  "warn_rate": null
+                },
+                "is_global": false,
+                "is_outward": true,
+                "is_remapped": false,
+                "msg_type": "std_msgs/msg/String",
+                "name": "status",
+                "namespace": [
+                  "api",
+                  "consumer"
+                ],
+                "port_path": "/api/consumer/input/status",
+                "remap_target": "~/input/status",
+                "topic": [
+                  "api",
+                  "status"
+                ],
+                "unique_id": "id_5f58bfa9a6854ab8"
+              },
+              {
+                "connected_ids": [
+                  "id_3c5169a9ffdd939d"
+                ],
+                "event": {
+                  "action_ids": [],
+                  "error_rate": null,
+                  "frequency": null,
+                  "name": "input_set_mode",
+                  "process_event": false,
+                  "timeout": null,
+                  "trigger_ids": [
+                    "id_3c5169a9ffdd939d"
+                  ],
+                  "type": "on_input",
+                  "unique_id": "id_cba889a22f44c1d7",
+                  "warn_rate": null
+                },
+                "is_global": false,
+                "is_outward": true,
+                "is_remapped": false,
+                "msg_type": "std_srvs/srv/SetBool",
+                "name": "set_mode",
+                "namespace": [
+                  "api",
+                  "consumer"
+                ],
+                "port_path": "/api/consumer/input/set_mode",
+                "remap_target": "~/input/set_mode",
+                "topic": [
+                  "api",
+                  "set_mode"
+                ],
+                "unique_id": "id_cba889a22f44c1d7"
+              },
+              {
+                "connected_ids": [
+                  "id_0af2f1410d28129f"
+                ],
+                "event": {
+                  "action_ids": [],
+                  "error_rate": null,
+                  "frequency": null,
+                  "name": "input_reset",
+                  "process_event": false,
+                  "timeout": null,
+                  "trigger_ids": [
+                    "id_0af2f1410d28129f"
+                  ],
+                  "type": "on_input",
+                  "unique_id": "id_cd63ec35f995fecc",
+                  "warn_rate": null
+                },
+                "is_global": false,
+                "is_outward": true,
+                "is_remapped": false,
+                "msg_type": "std_srvs/srv/Trigger",
+                "name": "reset",
+                "namespace": [
+                  "api",
+                  "consumer"
+                ],
+                "port_path": "/api/consumer/input/reset",
+                "remap_target": "~/input/reset",
+                "topic": [
+                  "api",
+                  "reset"
+                ],
+                "unique_id": "id_cd63ec35f995fecc"
+              }
+            ],
+            "launcher": {
+              "args": "",
+              "executable": "consumer_node",
+              "launch_state": "single_node",
+              "node_output": "screen",
+              "package": "services_pkg",
+              "param_files": [],
+              "param_values": [],
+              "ports": [
+                {
+                  "name": "status",
+                  "remap_target": "~/input/status",
+                  "topic": "/api/status"
+                },
+                {
+                  "name": "set_mode",
+                  "remap_target": "~/input/set_mode",
+                  "topic": "/api/set_mode"
+                },
+                {
+                  "name": "reset",
+                  "remap_target": "~/input/reset",
+                  "topic": "/api/reset"
+                }
+              ]
+            },
+            "links": [],
+            "name": "consumer",
+            "namespace": "/api",
+            "out_ports": [],
+            "package": "services_pkg",
+            "parameter_files_all": [],
+            "parameters": [],
+            "path": "/api/consumer",
+            "source_file": "${workspace_root}/ws/services_pkg/Consumer.node.yaml",
+            "unique_id": "id_789542f1943d70e4"
+          }
+        ],
+        "compute_unit": "main_ecu",
+        "entity_type": "module",
+        "events": [],
+        "in_ports": [],
+        "links": [
+          {
+            "connection_type": "INTERNAL_TO_INTERNAL",
+            "from_port": {
+              "connected_ids": [
+                "id_5f58bfa9a6854ab8",
+                "id_4a79de18e4f9eb20"
+              ],
+              "event": {
+                "action_ids": [
+                  "id_5f58bfa9a6854ab8",
+                  "id_4a79de18e4f9eb20"
+                ],
+                "error_rate": null,
+                "frequency": null,
+                "name": "output_status",
+                "process_event": false,
+                "timeout": null,
+                "trigger_ids": [
+                  "id_626f2493bf938b50"
+                ],
+                "type": "to_output",
+                "unique_id": "id_ba3f3b9a856b0a9b",
+                "warn_rate": null
+              },
+              "is_global": false,
+              "is_outward": false,
+              "is_remapped": false,
+              "msg_type": "std_msgs/msg/String",
+              "name": "status",
+              "namespace": [
+                "api",
+                "provider"
+              ],
+              "port_path": "/api/provider/output/status",
+              "remap_target": "~/output/status",
+              "topic": [
+                "api",
+                "status"
+              ],
+              "unique_id": "id_ba3f3b9a856b0a9b"
+            },
+            "msg_type": "std_msgs/msg/String",
+            "to_port": {
+              "connected_ids": [
+                "id_ba3f3b9a856b0a9b"
+              ],
+              "event": {
+                "action_ids": [
+                  "id_40d7e75954b54160"
+                ],
+                "error_rate": null,
+                "frequency": null,
+                "name": "input_status",
+                "process_event": false,
+                "timeout": null,
+                "trigger_ids": [
+                  "id_ba3f3b9a856b0a9b"
+                ],
+                "type": "on_input",
+                "unique_id": "id_5f58bfa9a6854ab8",
+                "warn_rate": null
+              },
+              "is_global": false,
+              "is_outward": false,
+              "is_remapped": false,
+              "msg_type": "std_msgs/msg/String",
+              "name": "status",
+              "namespace": [
+                "api",
+                "consumer"
+              ],
+              "port_path": "/api/consumer/input/status",
+              "remap_target": "~/input/status",
+              "topic": [
+                "api",
+                "status"
+              ],
+              "unique_id": "id_5f58bfa9a6854ab8"
+            },
+            "topic": "/api/status",
+            "unique_id": "id_16e78a0f42fd74be"
+          },
+          {
+            "connection_type": "INTERNAL_TO_INTERNAL",
+            "from_port": {
+              "connected_ids": [
+                "id_cba889a22f44c1d7",
+                "id_ff3c5abe0a5ff8b4"
+              ],
+              "event": {
+                "action_ids": [
+                  "id_cba889a22f44c1d7",
+                  "id_ff3c5abe0a5ff8b4"
+                ],
+                "error_rate": null,
+                "frequency": null,
+                "name": "output_set_mode",
+                "process_event": false,
+                "timeout": null,
+                "trigger_ids": [],
+                "type": "to_output",
+                "unique_id": "id_3c5169a9ffdd939d",
+                "warn_rate": null
+              },
+              "is_global": false,
+              "is_outward": false,
+              "is_remapped": false,
+              "msg_type": "std_srvs/srv/SetBool",
+              "name": "set_mode",
+              "namespace": [
+                "api",
+                "provider"
+              ],
+              "port_path": "/api/provider/output/set_mode",
+              "remap_target": "~/output/set_mode",
+              "topic": [
+                "api",
+                "set_mode"
+              ],
+              "unique_id": "id_3c5169a9ffdd939d"
+            },
+            "msg_type": "std_srvs/srv/SetBool",
+            "to_port": {
+              "connected_ids": [
+                "id_3c5169a9ffdd939d"
+              ],
+              "event": {
+                "action_ids": [],
+                "error_rate": null,
+                "frequency": null,
+                "name": "input_set_mode",
+                "process_event": false,
+                "timeout": null,
+                "trigger_ids": [
+                  "id_3c5169a9ffdd939d"
+                ],
+                "type": "on_input",
+                "unique_id": "id_cba889a22f44c1d7",
+                "warn_rate": null
+              },
+              "is_global": false,
+              "is_outward": false,
+              "is_remapped": false,
+              "msg_type": "std_srvs/srv/SetBool",
+              "name": "set_mode",
+              "namespace": [
+                "api",
+                "consumer"
+              ],
+              "port_path": "/api/consumer/input/set_mode",
+              "remap_target": "~/input/set_mode",
+              "topic": [
+                "api",
+                "set_mode"
+              ],
+              "unique_id": "id_cba889a22f44c1d7"
+            },
+            "topic": "/api/set_mode",
+            "unique_id": "id_0276d63d5116d7e4"
+          },
+          {
+            "connection_type": "INTERNAL_TO_INTERNAL",
+            "from_port": {
+              "connected_ids": [
+                "id_cd63ec35f995fecc",
+                "id_43a940fd98d50ec8"
+              ],
+              "event": {
+                "action_ids": [
+                  "id_cd63ec35f995fecc",
+                  "id_43a940fd98d50ec8"
+                ],
+                "error_rate": null,
+                "frequency": null,
+                "name": "output_reset",
+                "process_event": false,
+                "timeout": null,
+                "trigger_ids": [],
+                "type": "to_output",
+                "unique_id": "id_0af2f1410d28129f",
+                "warn_rate": null
+              },
+              "is_global": false,
+              "is_outward": false,
+              "is_remapped": false,
+              "msg_type": "std_srvs/srv/Trigger",
+              "name": "reset",
+              "namespace": [
+                "api",
+                "provider"
+              ],
+              "port_path": "/api/provider/output/reset",
+              "remap_target": "~/output/reset",
+              "topic": [
+                "api",
+                "reset"
+              ],
+              "unique_id": "id_0af2f1410d28129f"
+            },
+            "msg_type": "std_srvs/srv/Trigger",
+            "to_port": {
+              "connected_ids": [
+                "id_0af2f1410d28129f"
+              ],
+              "event": {
+                "action_ids": [],
+                "error_rate": null,
+                "frequency": null,
+                "name": "input_reset",
+                "process_event": false,
+                "timeout": null,
+                "trigger_ids": [
+                  "id_0af2f1410d28129f"
+                ],
+                "type": "on_input",
+                "unique_id": "id_cd63ec35f995fecc",
+                "warn_rate": null
+              },
+              "is_global": false,
+              "is_outward": false,
+              "is_remapped": false,
+              "msg_type": "std_srvs/srv/Trigger",
+              "name": "reset",
+              "namespace": [
+                "api",
+                "consumer"
+              ],
+              "port_path": "/api/consumer/input/reset",
+              "remap_target": "~/input/reset",
+              "topic": [
+                "api",
+                "reset"
+              ],
+              "unique_id": "id_cd63ec35f995fecc"
+            },
+            "topic": "/api/reset",
+            "unique_id": "id_95412cbf3a5be9ee"
+          },
+          {
+            "connection_type": "INTERNAL_TO_EXTERNAL",
+            "from_port": {
+              "connected_ids": [
+                "id_5f58bfa9a6854ab8",
+                "id_4a79de18e4f9eb20"
+              ],
+              "event": {
+                "action_ids": [
+                  "id_5f58bfa9a6854ab8",
+                  "id_4a79de18e4f9eb20"
+                ],
+                "error_rate": null,
+                "frequency": null,
+                "name": "output_status",
+                "process_event": false,
+                "timeout": null,
+                "trigger_ids": [
+                  "id_626f2493bf938b50"
+                ],
+                "type": "to_output",
+                "unique_id": "id_ba3f3b9a856b0a9b",
+                "warn_rate": null
+              },
+              "is_global": false,
+              "is_outward": false,
+              "is_remapped": false,
+              "msg_type": "std_msgs/msg/String",
+              "name": "status",
+              "namespace": [
+                "api",
+                "provider"
+              ],
+              "port_path": "/api/provider/output/status",
+              "remap_target": "~/output/status",
+              "topic": [
+                "api",
+                "status"
+              ],
+              "unique_id": "id_ba3f3b9a856b0a9b"
+            },
+            "msg_type": "std_msgs/msg/String",
+            "to_port": {
+              "connected_ids": [],
+              "event": {
+                "action_ids": [],
+                "error_rate": null,
+                "frequency": null,
+                "name": "output_status",
+                "process_event": false,
+                "timeout": null,
+                "trigger_ids": [],
+                "type": "to_output",
+                "unique_id": "id_b955c14ca2ce8384",
+                "warn_rate": null
+              },
+              "is_global": false,
+              "is_outward": true,
+              "is_remapped": false,
+              "msg_type": "std_msgs/msg/String",
+              "name": "status",
+              "namespace": [
+                "api"
+              ],
+              "port_path": "/api/output/status",
+              "remap_target": "~/output/status",
+              "topic": [
+                "api",
+                "status"
+              ],
+              "unique_id": "id_b955c14ca2ce8384"
+            },
+            "topic": "/api/status",
+            "unique_id": "id_891cbdd25702e77f"
+          },
+          {
+            "connection_type": "INTERNAL_TO_EXTERNAL",
+            "from_port": {
+              "connected_ids": [
+                "id_cba889a22f44c1d7",
+                "id_ff3c5abe0a5ff8b4"
+              ],
+              "event": {
+                "action_ids": [
+                  "id_cba889a22f44c1d7",
+                  "id_ff3c5abe0a5ff8b4"
+                ],
+                "error_rate": null,
+                "frequency": null,
+                "name": "output_set_mode",
+                "process_event": false,
+                "timeout": null,
+                "trigger_ids": [],
+                "type": "to_output",
+                "unique_id": "id_3c5169a9ffdd939d",
+                "warn_rate": null
+              },
+              "is_global": false,
+              "is_outward": false,
+              "is_remapped": false,
+              "msg_type": "std_srvs/srv/SetBool",
+              "name": "set_mode",
+              "namespace": [
+                "api",
+                "provider"
+              ],
+              "port_path": "/api/provider/output/set_mode",
+              "remap_target": "~/output/set_mode",
+              "topic": [
+                "api",
+                "set_mode"
+              ],
+              "unique_id": "id_3c5169a9ffdd939d"
+            },
+            "msg_type": "std_srvs/srv/SetBool",
+            "to_port": {
+              "connected_ids": [],
+              "event": {
+                "action_ids": [],
+                "error_rate": null,
+                "frequency": null,
+                "name": "output_set_mode",
+                "process_event": false,
+                "timeout": null,
+                "trigger_ids": [],
+                "type": "to_output",
+                "unique_id": "id_55394dbc3ca101a2",
+                "warn_rate": null
+              },
+              "is_global": false,
+              "is_outward": true,
+              "is_remapped": false,
+              "msg_type": "std_srvs/srv/SetBool",
+              "name": "set_mode",
+              "namespace": [
+                "api"
+              ],
+              "port_path": "/api/output/set_mode",
+              "remap_target": "~/output/set_mode",
+              "topic": [
+                "api",
+                "set_mode"
+              ],
+              "unique_id": "id_55394dbc3ca101a2"
+            },
+            "topic": "/api/set_mode",
+            "unique_id": "id_b4e7eef4a2e393c1"
+          },
+          {
+            "connection_type": "INTERNAL_TO_EXTERNAL",
+            "from_port": {
+              "connected_ids": [
+                "id_cd63ec35f995fecc",
+                "id_43a940fd98d50ec8"
+              ],
+              "event": {
+                "action_ids": [
+                  "id_cd63ec35f995fecc",
+                  "id_43a940fd98d50ec8"
+                ],
+                "error_rate": null,
+                "frequency": null,
+                "name": "output_reset",
+                "process_event": false,
+                "timeout": null,
+                "trigger_ids": [],
+                "type": "to_output",
+                "unique_id": "id_0af2f1410d28129f",
+                "warn_rate": null
+              },
+              "is_global": false,
+              "is_outward": false,
+              "is_remapped": false,
+              "msg_type": "std_srvs/srv/Trigger",
+              "name": "reset",
+              "namespace": [
+                "api",
+                "provider"
+              ],
+              "port_path": "/api/provider/output/reset",
+              "remap_target": "~/output/reset",
+              "topic": [
+                "api",
+                "reset"
+              ],
+              "unique_id": "id_0af2f1410d28129f"
+            },
+            "msg_type": "std_srvs/srv/Trigger",
+            "to_port": {
+              "connected_ids": [],
+              "event": {
+                "action_ids": [],
+                "error_rate": null,
+                "frequency": null,
+                "name": "output_reset",
+                "process_event": false,
+                "timeout": null,
+                "trigger_ids": [],
+                "type": "to_output",
+                "unique_id": "id_450ed52fc655cc48",
+                "warn_rate": null
+              },
+              "is_global": false,
+              "is_outward": true,
+              "is_remapped": false,
+              "msg_type": "std_srvs/srv/Trigger",
+              "name": "reset",
+              "namespace": [
+                "api"
+              ],
+              "port_path": "/api/output/reset",
+              "remap_target": "~/output/reset",
+              "topic": [
+                "api",
+                "reset"
+              ],
+              "unique_id": "id_450ed52fc655cc48"
+            },
+            "topic": "/api/reset",
+            "unique_id": "id_17ccd4dbf645caec"
+          }
+        ],
+        "name": "api",
+        "namespace": "/",
+        "out_ports": [
+          {
+            "connected_ids": [],
+            "event": {
+              "action_ids": [],
+              "error_rate": null,
+              "frequency": null,
+              "name": "output_status",
+              "process_event": false,
+              "timeout": null,
+              "trigger_ids": [],
+              "type": "to_output",
+              "unique_id": "id_b955c14ca2ce8384",
+              "warn_rate": null
+            },
+            "is_global": false,
+            "is_outward": true,
+            "is_remapped": false,
+            "msg_type": "std_msgs/msg/String",
+            "name": "status",
+            "namespace": [
+              "api"
+            ],
+            "port_path": "/api/output/status",
+            "remap_target": "~/output/status",
+            "topic": [
+              "api",
+              "status"
+            ],
+            "unique_id": "id_b955c14ca2ce8384"
+          },
+          {
+            "connected_ids": [],
+            "event": {
+              "action_ids": [],
+              "error_rate": null,
+              "frequency": null,
+              "name": "output_set_mode",
+              "process_event": false,
+              "timeout": null,
+              "trigger_ids": [],
+              "type": "to_output",
+              "unique_id": "id_55394dbc3ca101a2",
+              "warn_rate": null
+            },
+            "is_global": false,
+            "is_outward": true,
+            "is_remapped": false,
+            "msg_type": "std_srvs/srv/SetBool",
+            "name": "set_mode",
+            "namespace": [
+              "api"
+            ],
+            "port_path": "/api/output/set_mode",
+            "remap_target": "~/output/set_mode",
+            "topic": [
+              "api",
+              "set_mode"
+            ],
+            "unique_id": "id_55394dbc3ca101a2"
+          },
+          {
+            "connected_ids": [],
+            "event": {
+              "action_ids": [],
+              "error_rate": null,
+              "frequency": null,
+              "name": "output_reset",
+              "process_event": false,
+              "timeout": null,
+              "trigger_ids": [],
+              "type": "to_output",
+              "unique_id": "id_450ed52fc655cc48",
+              "warn_rate": null
+            },
+            "is_global": false,
+            "is_outward": true,
+            "is_remapped": false,
+            "msg_type": "std_srvs/srv/Trigger",
+            "name": "reset",
+            "namespace": [
+              "api"
+            ],
+            "port_path": "/api/output/reset",
+            "remap_target": "~/output/reset",
+            "topic": [
+              "api",
+              "reset"
+            ],
+            "unique_id": "id_450ed52fc655cc48"
+          }
+        ],
+        "parameters": [],
+        "path": "/api",
+        "source_file": "${workspace_root}/ws/services_pkg/Api.module.yaml",
+        "unique_id": "id_6ed01d7a15defc59"
+      },
+      {
+        "children": [],
+        "compute_unit": "main_ecu",
+        "entity_type": "node",
+        "events": [
+          {
+            "action_ids": [],
+            "error_rate": null,
+            "frequency": null,
+            "name": "watch",
+            "process_event": true,
+            "timeout": null,
+            "trigger_ids": [
+              "id_4a79de18e4f9eb20"
+            ],
+            "type": "on_input",
+            "unique_id": "id_2c1193a9619b4e22",
+            "warn_rate": null
+          }
+        ],
+        "in_ports": [
+          {
+            "connected_ids": [
+              "id_ba3f3b9a856b0a9b"
+            ],
+            "event": {
+              "action_ids": [
+                "id_2c1193a9619b4e22"
+              ],
+              "error_rate": null,
+              "frequency": null,
+              "name": "input_status",
+              "process_event": false,
+              "timeout": null,
+              "trigger_ids": [
+                "id_ba3f3b9a856b0a9b"
+              ],
+              "type": "on_input",
+              "unique_id": "id_4a79de18e4f9eb20",
+              "warn_rate": null
+            },
+            "is_global": false,
+            "is_outward": true,
+            "is_remapped": false,
+            "msg_type": "std_msgs/msg/String",
+            "name": "status",
+            "namespace": [
+              "watcher"
+            ],
+            "port_path": "/watcher/input/status",
+            "remap_target": "~/input/status",
+            "topic": [
+              "api",
+              "status"
+            ],
+            "unique_id": "id_4a79de18e4f9eb20"
+          },
+          {
+            "connected_ids": [
+              "id_3c5169a9ffdd939d"
+            ],
+            "event": {
+              "action_ids": [],
+              "error_rate": null,
+              "frequency": null,
+              "name": "input_set_mode",
+              "process_event": false,
+              "timeout": null,
+              "trigger_ids": [
+                "id_3c5169a9ffdd939d"
+              ],
+              "type": "on_input",
+              "unique_id": "id_ff3c5abe0a5ff8b4",
+              "warn_rate": null
+            },
+            "is_global": false,
+            "is_outward": true,
+            "is_remapped": false,
+            "msg_type": "std_srvs/srv/SetBool",
+            "name": "set_mode",
+            "namespace": [
+              "watcher"
+            ],
+            "port_path": "/watcher/input/set_mode",
+            "remap_target": "~/input/set_mode",
+            "topic": [
+              "api",
+              "set_mode"
+            ],
+            "unique_id": "id_ff3c5abe0a5ff8b4"
+          },
+          {
+            "connected_ids": [
+              "id_0af2f1410d28129f"
+            ],
+            "event": {
+              "action_ids": [],
+              "error_rate": null,
+              "frequency": null,
+              "name": "input_reset",
+              "process_event": false,
+              "timeout": null,
+              "trigger_ids": [
+                "id_0af2f1410d28129f"
+              ],
+              "type": "on_input",
+              "unique_id": "id_43a940fd98d50ec8",
+              "warn_rate": null
+            },
+            "is_global": false,
+            "is_outward": true,
+            "is_remapped": false,
+            "msg_type": "std_srvs/srv/Trigger",
+            "name": "reset",
+            "namespace": [
+              "watcher"
+            ],
+            "port_path": "/watcher/input/reset",
+            "remap_target": "~/input/reset",
+            "topic": [
+              "api",
+              "reset"
+            ],
+            "unique_id": "id_43a940fd98d50ec8"
+          }
+        ],
+        "launcher": {
+          "args": "",
+          "executable": "consumer_node",
+          "launch_state": "single_node",
+          "node_output": "screen",
+          "package": "services_pkg",
+          "param_files": [],
+          "param_values": [],
+          "ports": [
+            {
+              "name": "status",
+              "remap_target": "~/input/status",
+              "topic": "/api/status"
+            },
+            {
+              "name": "set_mode",
+              "remap_target": "~/input/set_mode",
+              "topic": "/api/set_mode"
+            },
+            {
+              "name": "reset",
+              "remap_target": "~/input/reset",
+              "topic": "/api/reset"
+            }
+          ]
+        },
+        "links": [],
+        "name": "watcher",
+        "namespace": "/",
+        "out_ports": [],
+        "package": "services_pkg",
+        "parameter_files_all": [],
+        "parameters": [],
+        "path": "/watcher",
+        "source_file": "${workspace_root}/ws/services_pkg/Consumer.node.yaml",
+        "unique_id": "id_7a829584557c9a71"
+      }
+    ],
+    "compute_unit": "",
+    "entity_type": "system",
+    "events": [],
+    "in_ports": [],
+    "links": [
+      {
+        "connection_type": "INTERNAL_TO_INTERNAL",
+        "from_port": {
+          "connected_ids": [],
+          "event": {
+            "action_ids": [],
+            "error_rate": null,
+            "frequency": null,
+            "name": "output_status",
+            "process_event": false,
+            "timeout": null,
+            "trigger_ids": [],
+            "type": "to_output",
+            "unique_id": "id_b955c14ca2ce8384",
+            "warn_rate": null
+          },
+          "is_global": false,
+          "is_outward": false,
+          "is_remapped": false,
+          "msg_type": "std_msgs/msg/String",
+          "name": "status",
+          "namespace": [
+            "api"
+          ],
+          "port_path": "/api/output/status",
+          "remap_target": "~/output/status",
+          "topic": [
+            "api",
+            "status"
+          ],
+          "unique_id": "id_b955c14ca2ce8384"
+        },
+        "msg_type": "std_msgs/msg/String",
+        "to_port": {
+          "connected_ids": [
+            "id_ba3f3b9a856b0a9b"
+          ],
+          "event": {
+            "action_ids": [
+              "id_2c1193a9619b4e22"
+            ],
+            "error_rate": null,
+            "frequency": null,
+            "name": "input_status",
+            "process_event": false,
+            "timeout": null,
+            "trigger_ids": [
+              "id_ba3f3b9a856b0a9b"
+            ],
+            "type": "on_input",
+            "unique_id": "id_4a79de18e4f9eb20",
+            "warn_rate": null
+          },
+          "is_global": false,
+          "is_outward": false,
+          "is_remapped": false,
+          "msg_type": "std_msgs/msg/String",
+          "name": "status",
+          "namespace": [
+            "watcher"
+          ],
+          "port_path": "/watcher/input/status",
+          "remap_target": "~/input/status",
+          "topic": [
+            "api",
+            "status"
+          ],
+          "unique_id": "id_4a79de18e4f9eb20"
+        },
+        "topic": "/api/status",
+        "unique_id": "id_0563fc1e7c045fa1"
+      },
+      {
+        "connection_type": "INTERNAL_TO_INTERNAL",
+        "from_port": {
+          "connected_ids": [],
+          "event": {
+            "action_ids": [],
+            "error_rate": null,
+            "frequency": null,
+            "name": "output_set_mode",
+            "process_event": false,
+            "timeout": null,
+            "trigger_ids": [],
+            "type": "to_output",
+            "unique_id": "id_55394dbc3ca101a2",
+            "warn_rate": null
+          },
+          "is_global": false,
+          "is_outward": false,
+          "is_remapped": false,
+          "msg_type": "std_srvs/srv/SetBool",
+          "name": "set_mode",
+          "namespace": [
+            "api"
+          ],
+          "port_path": "/api/output/set_mode",
+          "remap_target": "~/output/set_mode",
+          "topic": [
+            "api",
+            "set_mode"
+          ],
+          "unique_id": "id_55394dbc3ca101a2"
+        },
+        "msg_type": "std_srvs/srv/SetBool",
+        "to_port": {
+          "connected_ids": [
+            "id_3c5169a9ffdd939d"
+          ],
+          "event": {
+            "action_ids": [],
+            "error_rate": null,
+            "frequency": null,
+            "name": "input_set_mode",
+            "process_event": false,
+            "timeout": null,
+            "trigger_ids": [
+              "id_3c5169a9ffdd939d"
+            ],
+            "type": "on_input",
+            "unique_id": "id_ff3c5abe0a5ff8b4",
+            "warn_rate": null
+          },
+          "is_global": false,
+          "is_outward": false,
+          "is_remapped": false,
+          "msg_type": "std_srvs/srv/SetBool",
+          "name": "set_mode",
+          "namespace": [
+            "watcher"
+          ],
+          "port_path": "/watcher/input/set_mode",
+          "remap_target": "~/input/set_mode",
+          "topic": [
+            "api",
+            "set_mode"
+          ],
+          "unique_id": "id_ff3c5abe0a5ff8b4"
+        },
+        "topic": "/api/set_mode",
+        "unique_id": "id_73dab5cccedc9ef3"
+      },
+      {
+        "connection_type": "INTERNAL_TO_INTERNAL",
+        "from_port": {
+          "connected_ids": [],
+          "event": {
+            "action_ids": [],
+            "error_rate": null,
+            "frequency": null,
+            "name": "output_reset",
+            "process_event": false,
+            "timeout": null,
+            "trigger_ids": [],
+            "type": "to_output",
+            "unique_id": "id_450ed52fc655cc48",
+            "warn_rate": null
+          },
+          "is_global": false,
+          "is_outward": false,
+          "is_remapped": false,
+          "msg_type": "std_srvs/srv/Trigger",
+          "name": "reset",
+          "namespace": [
+            "api"
+          ],
+          "port_path": "/api/output/reset",
+          "remap_target": "~/output/reset",
+          "topic": [
+            "api",
+            "reset"
+          ],
+          "unique_id": "id_450ed52fc655cc48"
+        },
+        "msg_type": "std_srvs/srv/Trigger",
+        "to_port": {
+          "connected_ids": [
+            "id_0af2f1410d28129f"
+          ],
+          "event": {
+            "action_ids": [],
+            "error_rate": null,
+            "frequency": null,
+            "name": "input_reset",
+            "process_event": false,
+            "timeout": null,
+            "trigger_ids": [
+              "id_0af2f1410d28129f"
+            ],
+            "type": "on_input",
+            "unique_id": "id_43a940fd98d50ec8",
+            "warn_rate": null
+          },
+          "is_global": false,
+          "is_outward": false,
+          "is_remapped": false,
+          "msg_type": "std_srvs/srv/Trigger",
+          "name": "reset",
+          "namespace": [
+            "watcher"
+          ],
+          "port_path": "/watcher/input/reset",
+          "remap_target": "~/input/reset",
+          "topic": [
+            "api",
+            "reset"
+          ],
+          "unique_id": "id_43a940fd98d50ec8"
+        },
+        "topic": "/api/reset",
+        "unique_id": "id_a3823b7124922849"
+      }
+    ],
+    "name": "Hub_default",
+    "namespace": "/",
+    "out_ports": [],
+    "parameters": [],
+    "path": "/",
+    "source_file": "${workspace_root}/ws/services_pkg/Hub.system.yaml",
+    "unique_id": "id_2e29b14427c6c9a5"
+  },
+  "metadata": {
+    "mode": "default",
+    "system_name": "Hub"
+  },
+  "schema_version": "1.1"
+}

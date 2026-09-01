@@ -1,0 +1,33 @@
+autoware_system_design_format: 0.4.0
+
+name: Provider.node
+
+description: Dummy node offering a status topic and a mode service.
+
+package:
+  name: kind_pkg
+  provider: dummy
+
+launch:
+  plugin: kind::Provider
+  executable: provider_node
+  node_output: screen
+
+subscribers: []
+
+publishers:
+  - name: status
+    message_type: std_msgs/msg/String
+
+servers:
+  - name: set_mode
+    message_type: std_srvs/srv/SetBool
+
+param_files: []
+param_values: []
+
+processes:
+  - name: report
+    trigger_conditions: []
+    outcomes:
+      - to_output: status

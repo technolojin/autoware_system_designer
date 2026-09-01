@@ -38,7 +38,7 @@ class PortDefinition:
     """Typed definition for a node or module input/output port."""
 
     name: str
-    port_role: str  # "subscriber" | "client" | "publisher" | "server"
+    port_role: Optional[str]  # "subscriber" | "client" | "publisher" | "server"
     message_type: Optional[str] = None
     remap_target: Optional[str] = None
     global_topic: Optional[str] = None  # global ROS topic override (was "global" key)
@@ -47,7 +47,7 @@ class PortDefinition:
     def from_dict(cls, d: dict) -> PortDefinition:
         return cls(
             name=d["name"],
-            port_role=d.get("port_role", "subscriber"),
+            port_role=d.get("port_role"),
             message_type=d.get("message_type"),
             remap_target=d.get("remap_target"),
             global_topic=d.get("global"),

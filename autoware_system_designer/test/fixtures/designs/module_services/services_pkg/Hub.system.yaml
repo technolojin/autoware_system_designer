@@ -1,0 +1,27 @@
+autoware_system_design_format: 0.4.0
+
+name: Hub.system
+
+description: Api module serving a standalone watcher node over topic and service connections.
+
+modes:
+  - name: default
+    description: Default mode
+    default: true
+
+components:
+  - name: api
+    entity: Api.module
+    path: /api
+    compute_unit: main_ecu
+  - name: watcher
+    entity: Consumer.node
+    compute_unit: main_ecu
+
+connections:
+  - - api.publisher.status
+    - watcher.subscriber.status
+  - - api.server.set_mode
+    - watcher.client.set_mode
+  - - api.server.reset
+    - watcher.client.reset

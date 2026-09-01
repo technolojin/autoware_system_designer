@@ -1,0 +1,18 @@
+autoware_system_design_format: 0.4.0
+
+name: EmptyWildcard.system
+
+description: Module whose publisher wildcard has no publisher ports to match.
+
+modes:
+  - name: default
+    description: Default mode
+    default: true
+
+components:
+  - name: srv_only
+    entity: SrvOnly.module
+    path: /srv_only
+    compute_unit: main_ecu
+
+connections: []

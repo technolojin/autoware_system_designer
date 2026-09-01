@@ -222,18 +222,29 @@ class Connection:
         self.from_instance: str = from_port[0]
         self.from_port_name: str = from_port[1]
         self.from_is_external: bool = not from_port[0]
+        self.from_port_type: str = port0_type if port0_is_from else port1_type
         self.to_instance: str = to_port[0]
         self.to_port_name: str = to_port[1]
         self.to_is_external: bool = not to_port[0]
+        self.to_port_type: str = port1_type if port0_is_from else port0_type
+
+    PORT_TYPES: ClassVar[tuple] = ("publisher", "subscriber", "server", "client")
 
     @staticmethod
     def _parse_port_name(port_name: str) -> tuple[str, str, str]:  # (instance_name, port_type, port_name)
         parts = port_name.split(".")
         if len(parts) == 2:
-            return "", parts[0], parts[1]
-        if len(parts) == 3:
-            return parts[0], parts[1], parts[2]
-        raise DeploymentError(f"Invalid port name: {port_name}")
+            instance, port_type, name = "", parts[0], parts[1]
+        elif len(parts) == 3:
+            instance, port_type, name = parts[0], parts[1], parts[2]
+        else:
+            raise DeploymentError(f"Invalid port name: {port_name}")
+        if port_type not in Connection.PORT_TYPES:
+            raise DeploymentError(
+                f"[E_CONN_PORT_KIND] Invalid port kind '{port_type}' in '{port_name}' "
+                f"(expected one of {', '.join(Connection.PORT_TYPES)})"
+            )
+        return instance, port_type, name
 
     @staticmethod
     def _is_output_port_type(port_type: str) -> bool:

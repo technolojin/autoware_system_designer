@@ -1,0 +1,36 @@
+autoware_system_design_format: 0.4.0
+
+name: Consumer.node
+
+description: Dummy node watching the status topic and calling the mode services.
+
+package:
+  name: services_pkg
+  provider: dummy
+
+launch:
+  plugin: services::Consumer
+  executable: consumer_node
+  node_output: screen
+
+subscribers:
+  - name: status
+    message_type: std_msgs/msg/String
+
+publishers: []
+
+clients:
+  - name: set_mode
+    message_type: std_srvs/srv/SetBool
+  - name: reset
+    message_type: std_srvs/srv/Trigger
+
+param_files: []
+param_values: []
+
+processes:
+  - name: watch
+    trigger_conditions:
+      - or:
+          - on_input: status
+    outcomes: []

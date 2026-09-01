@@ -1,0 +1,17 @@
+autoware_system_design_format: 0.4.0
+
+name: SrvOnly.module
+
+description: Publisher wildcard over a node exposing only service ports.
+
+instances:
+  - name: provider
+    entity: ServiceOnly.node
+
+subscribers: []
+
+publishers: []
+
+connections:
+  - - provider.publisher.^
+    - publisher.^

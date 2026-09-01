@@ -1,0 +1,24 @@
+autoware_system_design_format: 0.4.0
+
+name: Dup.system
+
+description: The same connection line written twice.
+
+modes:
+  - name: default
+    description: Default mode
+    default: true
+
+components:
+  - name: provider
+    entity: Provider.node
+    compute_unit: main_ecu
+  - name: consumer
+    entity: Consumer.node
+    compute_unit: main_ecu
+
+connections:
+  - - provider.publisher.status
+    - consumer.subscriber.status
+  - - provider.publisher.status
+    - consumer.subscriber.status

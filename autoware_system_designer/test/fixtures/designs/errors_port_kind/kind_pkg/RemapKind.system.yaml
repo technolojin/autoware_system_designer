@@ -1,0 +1,26 @@
+autoware_system_design_format: 0.4.0
+
+name: RemapKind.system
+
+description: Remap entry declaring publisher over a service server port.
+
+modes:
+  - name: default
+    description: Default mode
+    default: true
+
+components:
+  - name: provider
+    entity: Provider.node
+    compute_unit: main_ecu
+  - name: consumer
+    entity: Consumer.node
+    compute_unit: main_ecu
+
+connections:
+  - - provider.publisher.status
+    - consumer.subscriber.status
+
+remaps:
+  - source: provider.publisher.set_mode
+    topic: /api/set_mode

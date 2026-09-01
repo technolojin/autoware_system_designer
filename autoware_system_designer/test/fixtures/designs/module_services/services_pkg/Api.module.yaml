@@ -1,0 +1,32 @@
+autoware_system_design_format: 0.4.0
+
+name: Api.module
+
+description: Provider and consumer pair; publisher and server wildcards exported side by side.
+
+instances:
+  - name: provider
+    entity: Provider.node
+  - name: consumer
+    entity: Consumer.node
+
+subscribers: []
+
+publishers:
+  - name: status
+
+servers:
+  - name: set_mode
+  - name: reset
+
+connections:
+  # internal wiring first so the boundary export pins the exported topic
+  - - provider.publisher.status
+    - consumer.subscriber.status
+  - - provider.server.^
+    - consumer.client.^
+  # parallel per-kind wildcard exports
+  - - provider.publisher.^
+    - publisher.^
+  - - provider.server.^
+    - server.^

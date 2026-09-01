@@ -64,10 +64,12 @@ class Port:
     # True when topic is set by a system remap entry
     is_remapped: bool = False
     remap_target: Optional[str] = None
+    # ROS interface kind: publisher/subscriber/server/client
+    role: Optional[str] = field(default=None, metadata={"exclude": True})
 
     __serde_computed__: ClassVar[tuple] = (("unique_id", "unique_id"), ("port_path", "port_path"))
 
-    def __init__(self, name: str, msg_type: str, namespace: List[str] = [], remap_target: str = None):
+    def __init__(self, name: str, msg_type: str, namespace: List[str] = [], remap_target: str = None, role: str = None):
         self.name = name
         self.msg_type = msg_type
         self.namespace = namespace
@@ -77,6 +79,7 @@ class Port:
         self.is_global = False
         self.is_remapped = False
         self.remap_target = remap_target
+        self.role = role
 
     @property
     def unique_id(self):
@@ -122,8 +125,8 @@ class InPort(Port):
     # InPort (subscriber) can have multiple servers (one topic subscribed by multiple nodes).
     servers: List[Port] = field(default_factory=list, metadata={"ref": True, "alias": "connected_ids"})
 
-    def __init__(self, name, msg_type, namespace: List[str] = [], remap_target: str = None):
-        super().__init__(name, msg_type, namespace, remap_target)
+    def __init__(self, name, msg_type, namespace: List[str] = [], remap_target: str = None, role: str = None):
+        super().__init__(name, msg_type, namespace, remap_target, role)
         self.is_required = True
         self.servers = []
         self.event = PortEvent("input_" + name, namespace, "input", name)
@@ -170,8 +173,8 @@ class OutPort(Port):
     # OutPort (publisher) can have multiple users (one topic subscribed by multiple nodes).
     users: List[Port] = field(default_factory=list, metadata={"ref": True, "alias": "connected_ids"})
 
-    def __init__(self, name, msg_type, namespace: List[str] = [], remap_target: str = None):
-        super().__init__(name, msg_type, namespace, remap_target)
+    def __init__(self, name, msg_type, namespace: List[str] = [], remap_target: str = None, role: str = None):
+        super().__init__(name, msg_type, namespace, remap_target, role)
         self.frequency = 0.0
         self.is_monitored = False
         self.users = []

@@ -35,6 +35,7 @@ class _PortInfo:
     port_name: str
     instance: Optional["Instance"]
     port: Optional[InPort | OutPort]
+    role: Optional[str] = None
 
 
 logger = logging.getLogger(__name__)
@@ -254,7 +255,8 @@ class LinkManager:
     def _err_wildcard_no_matches(self, connection: Connection):
         return (
             "[E_WILDCARD_EMPTY] No ports matched wildcard patterns. "
-            f"From='{connection.from_instance}.{connection.from_port_name}' To='{connection.to_instance}.{connection.to_port_name}'"
+            f"From='{connection.from_instance}.{connection.from_port_type}.{connection.from_port_name}' "
+            f"To='{connection.to_instance}.{connection.to_port_type}.{connection.to_port_name}'"
             f"{format_source(getattr(connection, 'source', None))}"
         )
 
@@ -284,9 +286,16 @@ class LinkManager:
         else:
             cfg_list = getattr(self.instance.configuration, "outputs", []) or []
 
-        declared_names = {item.name for item in cfg_list}
-        if port_obj.name not in declared_names:
-            raise ValidationError(self._err_external_decl(kind, port_obj.name, sorted(declared_names)))
+        declared_roles = {item.name: item.port_role for item in cfg_list}
+        if port_obj.name not in declared_roles:
+            raise ValidationError(self._err_external_decl(kind, port_obj.name, sorted(declared_roles)))
+
+        declared_role = declared_roles[port_obj.name]
+        if port_obj.role and declared_role and port_obj.role != declared_role:
+            raise ValidationError(
+                f"[E_EXT_DECL_KIND] External port '{port_obj.name}' declared as {declared_role} "
+                f"but connected as {port_obj.role}"
+            )
 
         existing = port_dict.get(port_obj.name)
         if existing:
@@ -336,17 +345,17 @@ class LinkManager:
         if connection.type == ConnectionType.EXTERNAL_TO_INTERNAL:
             if to_port is None:
                 raise ValidationError(
-                    f"[E_CONN_TARGET_MISSING] EXTERNAL_TO_INTERNAL input.{connection.from_port_name} -> {connection.to_instance}.input.{connection.to_port_name}"
+                    f"[E_CONN_TARGET_MISSING] EXTERNAL_TO_INTERNAL {connection.from_port_type}.{connection.from_port_name} -> {connection.to_instance}.{connection.to_port_type}.{connection.to_port_name}"
                 )
             port_name = from_info.port_name if from_info else connection.from_port_name
-            from_port = InPort(port_name, to_port.msg_type, self.instance.resolved_path)
+            from_port = InPort(port_name, to_port.msg_type, self.instance.resolved_path, role=connection.from_port_type)
         elif connection.type == ConnectionType.INTERNAL_TO_EXTERNAL:
             if from_port is None:
                 raise ValidationError(
-                    f"[E_CONN_SOURCE_MISSING] INTERNAL_TO_EXTERNAL {connection.from_instance}.output.{connection.from_port_name} -> output.{connection.to_port_name}"
+                    f"[E_CONN_SOURCE_MISSING] INTERNAL_TO_EXTERNAL {connection.from_instance}.{connection.from_port_type}.{connection.from_port_name} -> {connection.to_port_type}.{connection.to_port_name}"
                 )
             port_name = to_info.port_name if to_info else connection.to_port_name
-            to_port = OutPort(port_name, from_port.msg_type, self.instance.resolved_path)
+            to_port = OutPort(port_name, from_port.msg_type, self.instance.resolved_path, role=connection.to_port_type)
 
         if from_info is not None:
             from_info.port = from_port
@@ -354,6 +363,28 @@ class LinkManager:
             to_info.port = to_port
 
         return from_port, to_port
+
+    @staticmethod
+    def _filter_candidates(ports: Dict[str, _PortInfo], declared_kind: str, external: bool) -> Dict[str, _PortInfo]:
+        """Restrict match candidates to the connection's declared side: boundary vs child, and port kind."""
+        filtered = {}
+        for key, info in ports.items():
+            if (info.instance is None) != external:
+                continue
+            if info.role is not None and info.role != declared_kind:
+                continue
+            if info.role is None:
+                logger.debug(f"Port '{key}' has no role; kind filter '{declared_kind}' not applied")
+            filtered[key] = info
+        return filtered
+
+    def _check_port_kind(self, connection: Connection, info: _PortInfo, declared_kind: str, key: str):
+        """Validate that a connection endpoint's declared kind matches the port's actual kind."""
+        if info.role is not None and info.role != declared_kind:
+            raise ValidationError(
+                f"[E_PORT_KIND] Connection declares '{declared_kind}' but port '{key}' is a {info.role}"
+                f"{format_source(getattr(connection, 'source', None))}"
+            )
 
     def _create_wildcard_links(
         self,
@@ -372,12 +403,12 @@ class LinkManager:
         from_idx = f"{connection.from_instance}.{connection.from_port_name}"
         to_idx = f"{connection.to_instance}.{connection.to_port_name}"
 
-        # Match and pair ports based on wildcard patterns
+        # Match and pair ports based on wildcard patterns, per declared side and kind
         port_pairs = match_and_pair_wildcard_ports(
             from_idx,
             to_idx,
-            port_list_from,
-            port_list_to,
+            self._filter_candidates(port_list_from, connection.from_port_type, connection.from_is_external),
+            self._filter_candidates(port_list_to, connection.to_port_type, connection.to_is_external),
         )
 
         # Validate matched ports
@@ -431,14 +462,14 @@ class LinkManager:
         def _format_connection_string(conn: Connection) -> str:
             """Format connection for display in error messages."""
             if conn.from_instance == "":
-                from_str = f"input.{conn.from_port_name}"
+                from_str = f"{conn.from_port_type}.{conn.from_port_name}"
             else:
-                from_str = f"{conn.from_instance}.output.{conn.from_port_name}"
+                from_str = f"{conn.from_instance}.{conn.from_port_type}.{conn.from_port_name}"
 
             if conn.to_instance == "":
-                to_str = f"output.{conn.to_port_name}"
+                to_str = f"{conn.to_port_type}.{conn.to_port_name}"
             else:
-                to_str = f"{conn.to_instance}.input.{conn.to_port_name}"
+                to_str = f"{conn.to_instance}.{conn.to_port_type}.{conn.to_port_name}"
 
             return f"{from_str} -> {to_str}"
 
@@ -446,8 +477,11 @@ class LinkManager:
         duplicate_indices: List[int] = []  # indices of duplicates to remove
 
         for idx, conn in enumerate(connection_list):
-            # Create a signature for the connection (endpoints only)
-            conn_signature = f"{conn.from_instance}.{conn.from_port_name} -> {conn.to_instance}.{conn.to_port_name}"
+            # Create a signature for the connection (endpoints with declared kinds)
+            conn_signature = (
+                f"{conn.from_instance}.{conn.from_port_type}.{conn.from_port_name}"
+                f" -> {conn.to_instance}.{conn.to_port_type}.{conn.to_port_name}"
+            )
 
             if conn_signature in seen_connections:
                 conn_str = _format_connection_string(conn)
@@ -484,19 +518,23 @@ class LinkManager:
         for child_key, child_instance in self.instance.children.items():
             for port_name, port in child_instance.link_manager.in_ports.items():
                 idx = f"{child_key}.{port_name}"
-                port_list_to[idx] = _PortInfo(port_name=port_name, instance=child_instance, port=port)
+                port_list_to[idx] = _PortInfo(port_name=port_name, instance=child_instance, port=port, role=port.role)
             for port_name, port in child_instance.link_manager.out_ports.items():
                 idx = f"{child_key}.{port_name}"
-                port_list_from[idx] = _PortInfo(port_name=port_name, instance=child_instance, port=port)
+                port_list_from[idx] = _PortInfo(port_name=port_name, instance=child_instance, port=port, role=port.role)
 
         # ports from external interfaces
         inputs = getattr(self.instance.configuration, "inputs", []) or []
         for ext_input in inputs:
-            port_list_from[f".{ext_input.name}"] = _PortInfo(port_name=ext_input.name, instance=None, port=None)
+            port_list_from[f".{ext_input.name}"] = _PortInfo(
+                port_name=ext_input.name, instance=None, port=None, role=ext_input.port_role
+            )
 
         outputs = getattr(self.instance.configuration, "outputs", []) or []
         for ext_output in outputs:
-            port_list_to[f".{ext_output.name}"] = _PortInfo(port_name=ext_output.name, instance=None, port=None)
+            port_list_to[f".{ext_output.name}"] = _PortInfo(
+                port_name=ext_output.name, instance=None, port=None, role=ext_output.port_role
+            )
 
         # Apply remap entries before creating links so that link resolution in
         # links.py sees is_remapped=True and preserves the overridden topic.
@@ -567,6 +605,9 @@ class LinkManager:
                     logger.warning(msg)
                     continue
 
+                self._check_port_kind(connection, from_info, connection.from_port_type, from_key)
+                self._check_port_kind(connection, to_info, connection.to_port_type, to_key)
+
                 from_port, to_port = self._resolve_ports_for_connection(connection, from_info, to_info)
                 if isinstance(to_port, InPort) and to_port.is_global:
                     logger.warning(
@@ -625,6 +666,12 @@ class LinkManager:
                     f"'{instance_name}'. Available: {available}"
                 )
 
+            if port.role is not None and port.role != port_type:
+                raise ValidationError(
+                    f"[E_REMAP_PORT_TYPE] Remap source '{entry.source}' declares {port_type} "
+                    f"but port '{port_name}' is a {port.role}"
+                )
+
             if not entry.topic.startswith("/"):
                 raise ValidationError(
                     f"[E_REMAP_TOPIC] Remap topic '{entry.topic}' must be an absolute ROS topic " f"starting with '/'"
@@ -674,6 +721,7 @@ class LinkManager:
                 cfg_in_port.message_type,
                 self.instance.resolved_path,
                 remap_target=cfg_in_port.remap_target,
+                role=cfg_in_port.port_role,
             )
             if cfg_in_port.global_topic is not None:
                 in_port_instance.is_global = True
@@ -690,6 +738,7 @@ class LinkManager:
                 cfg_out_port.message_type,
                 self.instance.resolved_path,
                 remap_target=cfg_out_port.remap_target,
+                role=cfg_out_port.port_role,
             )
             if cfg_out_port.global_topic is not None:
                 out_port_instance.is_global = True
