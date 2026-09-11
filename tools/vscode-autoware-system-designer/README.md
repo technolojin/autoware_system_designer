@@ -11,8 +11,9 @@ with the extension (or checked out next to it during development).
 ### Connection Validation
 
 - **Port resolution** against the same `instance.port` key space the designer builds at deploy time
-- **Wildcard connections** — `*`, `^` and `+` are expanded and reported when nothing matches
+- **Wildcard connections** — `*`, `^` and `+` are expanded per declared port kind and reported when nothing matches
 - **Port role pairing** — publisher/subscriber and server/client, checked by the designer's own parser
+- **Port kind** — an endpoint must name the kind the port is defined with
 - **External interfaces** — connections must reference declared module inputs and outputs
 - **Message type compatibility** between the two ends of a connection (warning)
 - **Cross-file validation** through the workspace entity registry

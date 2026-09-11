@@ -319,7 +319,12 @@ class ValidationEngine:
         to_key = f"{parsed.to_instance}.{parsed.to_port_name}"
 
         if any(char in from_key or char in to_key for char in _WILDCARD_CHARS):
-            pairs = match_and_pair_wildcard_ports(from_key, to_key, graph.outputs, graph.inputs)
+            pairs = match_and_pair_wildcard_ports(
+                from_key,
+                to_key,
+                self._filter_candidates(graph.outputs, parsed.from_port_type, parsed.from_is_external),
+                self._filter_candidates(graph.inputs, parsed.to_port_type, parsed.to_is_external),
+            )
             if not pairs:
                 diagnostics.append(
                     self._connection_diagnostic(
@@ -357,21 +362,55 @@ class ValidationEngine:
                 )
             )
 
-        if source_found and target_found:
-            mismatch = self._check_message_type_compatibility(graph.outputs[from_key], graph.inputs[to_key])
-            if mismatch:
-                diagnostics.append(
-                    self._connection_diagnostic(
-                        index,
-                        from_side,
-                        mismatch,
-                        document_content,
-                        source_map,
-                        severity=lsp.DiagnosticSeverity.Warning,
-                    )
+        if not source_found or not target_found:
+            return diagnostics
+
+        kind_diagnostics = [
+            self._connection_diagnostic(index, side, message, document_content, source_map)
+            for side, message in (
+                (from_side, self._port_kind_mismatch(graph.outputs[from_key], parsed.from_port_type, from_key)),
+                (to_side, self._port_kind_mismatch(graph.inputs[to_key], parsed.to_port_type, to_key)),
+            )
+            if message
+        ]
+        if kind_diagnostics:
+            return diagnostics + kind_diagnostics
+
+        mismatch = self._check_message_type_compatibility(graph.outputs[from_key], graph.inputs[to_key])
+        if mismatch:
+            diagnostics.append(
+                self._connection_diagnostic(
+                    index,
+                    from_side,
+                    mismatch,
+                    document_content,
+                    source_map,
+                    severity=lsp.DiagnosticSeverity.Warning,
                 )
+            )
 
         return diagnostics
+
+    @staticmethod
+    def _filter_candidates(entries: Dict[str, _PortEntry], declared_kind: str, external: bool) -> Dict[str, _PortEntry]:
+        """Restrict wildcard candidates to the connection's declared side: boundary vs child, and port kind."""
+        filtered: Dict[str, _PortEntry] = {}
+        for key, entry in entries.items():
+            if key.startswith(".") != external:
+                continue
+            role = entry[2].port_role
+            if role is not None and role != declared_kind:
+                continue
+            filtered[key] = entry
+        return filtered
+
+    @staticmethod
+    def _port_kind_mismatch(entry: _PortEntry, declared_kind: str, key: str) -> Optional[str]:
+        """Report an endpoint whose declared kind differs from the kind the port is defined with."""
+        role = entry[2].port_role
+        if role is not None and role != declared_kind:
+            return f"Connection declares '{declared_kind}' but port '{key}' is a {role}"
+        return None
 
     def _missing_port_message(
         self, instance_name: str, port_name: str, direction: str, config: Config, graph: "_ConnectionGraph"

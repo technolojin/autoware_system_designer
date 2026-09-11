@@ -16,8 +16,9 @@ _server_dir = os.path.dirname(os.path.abspath(__file__))
 _bundled_path = os.path.join(_server_dir, "bundled")
 _dev_path = os.path.normpath(os.path.join(_server_dir, "..", "..", "..", "autoware_system_designer"))
 for _pkg_root in [_dev_path, _bundled_path]:
-    if os.path.isdir(_pkg_root) and _pkg_root not in sys.path:
-        sys.path.insert(0, _pkg_root)
+    if os.path.isdir(_pkg_root):
+        if _pkg_root not in sys.path:
+            sys.path.insert(0, _pkg_root)
         break
 
 from document_processor import DocumentProcessor

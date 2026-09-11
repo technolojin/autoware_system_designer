@@ -239,3 +239,56 @@ def test_service_connections_pair_server_with_client(workspace):
     )
     assert len(diagnostics) == 1
     assert "Invalid internal connection type" in diagnostics[0].message
+
+
+def test_declared_kind_must_match_the_port_kind(workspace):
+    diagnostics = diagnose(
+        workspace,
+        """
+        - - talker.publisher.reset
+          - listener.subscriber.reset
+        """,
+    )
+    assert len(diagnostics) == 2
+    assert all(diagnostic.severity == lsp.DiagnosticSeverity.Error for diagnostic in diagnostics)
+    assert "Connection declares 'publisher' but port 'talker.reset' is a server" in messages(diagnostics)
+    assert "Connection declares 'subscriber' but port 'listener.reset' is a client" in messages(diagnostics)
+
+
+def test_external_declaration_kind_must_match(workspace):
+    diagnostics = diagnose(
+        workspace,
+        """
+        - - talker.publisher.reset
+          - publisher.external_out
+        """,
+    )
+    assert len(diagnostics) == 1
+    assert "Connection declares 'publisher' but port 'talker.reset' is a server" in diagnostics[0].message
+
+
+def test_wildcards_pair_only_within_the_declared_kind(workspace):
+    assert (
+        diagnose(
+            workspace,
+            """
+            - - talker.publisher.^
+              - listener.subscriber.^
+            - - talker.server.^
+              - listener.client.^
+            """,
+        )
+        == []
+    )
+
+
+def test_wildcard_of_a_kind_without_ports_is_reported(workspace):
+    diagnostics = diagnose(
+        workspace,
+        """
+        - - talker.server.stat*
+          - listener.client.stat*
+        """,
+    )
+    assert len(diagnostics) == 1
+    assert "No ports match the wildcard connection" in diagnostics[0].message
