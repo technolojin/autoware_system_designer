@@ -19,6 +19,8 @@
   --spinner-border: #f3f3f3;
   --spinner-active: #0d6efd;
   --error-color: #dc3545;
+  --link-color: #1e88e5;
+  --mono-font: "Consolas", monospace;
 }
 
 [data-theme="dark"] {
@@ -42,6 +44,7 @@
   --spinner-border: #495057;
   --spinner-active: #0d6efd;
   --error-color: #dc3545;
+  --link-color: #4da3ff;
 }
 
 body {
@@ -225,6 +228,13 @@ body {
   position: relative;
 }
 
+/* The canvas one diagram module owns, replaced whenever the diagram changes. */
+.diagram-canvas {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
 #mode-selector-section {
   padding: 15px 20px;
   border-bottom: 1px solid var(--border-color);
@@ -288,6 +298,24 @@ body {
   font-family: "Segoe UI", sans-serif;
   font-size: 9px;
   pointer-events: none;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+/* Port whose topic is fixed by a node-level global key */
+.port-global {
+  stroke: #20c997;
+  fill: rgba(32, 201, 151, 0.3);
+}
+
+/* Global topic star: shown only while one of its ports is selected.
+   Stroke and fill are set by JS so they follow the diagram color presets. */
+.global-topic-line {
+  fill: none;
+}
+
+.global-topic-label {
+  font-family: "Segoe UI", sans-serif;
   text-anchor: middle;
   dominant-baseline: middle;
 }
@@ -435,8 +463,145 @@ body {
 
 .info-value {
   color: var(--text-primary);
-  font-family: "Consolas", monospace;
+  font-family: var(--mono-font);
   word-break: break-all;
+}
+
+.info-value-full {
+  width: 100%;
+}
+
+.info-group {
+  margin-bottom: 15px;
+}
+
+.info-group:last-child {
+  margin-bottom: 0;
+}
+
+.info-subtitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+/* Interface card: one entry per port */
+.port-entry {
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.port-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.port-type {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: var(--mono-font);
+  margin-top: 1px;
+  overflow-wrap: anywhere;
+}
+
+/* Parameter card: name plus source badge on the left, resolved value on the right */
+.param-entry {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.param-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.param-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  word-break: break-all;
+  flex: 1;
+}
+
+.param-value {
+  font-family: var(--mono-font);
+  font-size: 12px;
+  color: var(--text-primary);
+  word-break: break-all;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Badge colors encode where a parameter value came from. */
+.param-badge {
+  --badge-color: #888888;
+  --badge-tint: 136, 136, 136;
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--mono-font);
+  color: var(--badge-color);
+  background: rgba(var(--badge-tint), 0.12);
+  border: 1px solid rgba(var(--badge-tint), 0.35);
+  border-radius: 3px;
+  padding: 1px 5px;
+  vertical-align: middle;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+a.param-badge {
+  cursor: pointer;
+}
+
+.param-badge[data-type="OVERRIDE"],
+.param-badge[data-type="OVERRIDE_FILE"] {
+  --badge-color: #d4890a;
+  --badge-tint: 212, 137, 10;
+}
+
+.param-badge[data-type="MODE"],
+.param-badge[data-type="MODE_FILE"] {
+  --badge-color: #1e88e5;
+  --badge-tint: 30, 136, 229;
+}
+
+.param-badge[data-type="GLOBAL"] {
+  --badge-color: #8e24aa;
+  --badge-tint: 142, 36, 170;
+}
+
+/* Jump-to-editor links on source locations */
+.source-link {
+  color: var(--link-color);
+  text-decoration: none;
+  word-break: break-all;
+  font-size: 13px;
+  font-family: var(--mono-font);
+}
+
+.package-source-link {
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.diagram-error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: var(--error-color);
+}
+
+body.resizing-sidebar {
+  cursor: col-resize;
+  user-select: none;
 }
 
 /* Settings gear button */
@@ -585,34 +750,189 @@ body {
   transform: translateX(26px);
 }
 
-/* --- Logic Diagram Integrated Styles --- */
+/* --- Logic Diagram --- */
 .logic-diagram-container {
   width: 100%;
   height: 100%;
   min-height: 400px;
   position: relative;
   overflow: hidden;
-  background-color: var(--bg-secondary);
-}
-.logic-diagram-container svg {
-  cursor: grab;
-  min-width: 100px;
-  min-height: 100px;
-}
-.logic-diagram-container svg:active {
-  cursor: grabbing;
 }
 
-/* Logic diagram highlighting — scoped to avoid clobbering node_diagram inline styles */
-.logic-diagram-container .highlighted {
-  stroke-width: 3px !important;
+/* Event glyphs: chevrons for the ports, outlines for the gates. Highlight
+   colors are set by JS so they follow the diagram color presets. */
+.logic-event {
+  stroke: var(--text-muted);
+  stroke-width: 0.5px;
+  fill: var(--text-secondary);
 }
-.logic-diagram-container g.node.highlighted polygon,
-.logic-diagram-container g.node.highlighted ellipse {
-  stroke-width: 3px !important;
+
+.logic-event-output {
+  fill: var(--border-hover);
 }
-.logic-diagram-container g.edge.highlighted path {
-  stroke-width: 3px !important;
+
+.logic-process {
+  stroke: var(--text-secondary);
+  stroke-width: 1px;
+  fill: var(--bg-tertiary);
+}
+
+.logic-process-unknown {
+  stroke-dasharray: 3 2;
+}
+
+/* No clock root reaches this event, so nothing paces it. */
+.logic-unclocked {
+  opacity: 0.45;
+}
+
+.logic-vertex-body {
+  transition: stroke 0.1s;
+}
+
+/* The node box the events inside it are declared by. */
+.logic-group-rect {
+  stroke-width: 1px;
+  transition: stroke 0.1s;
+}
+
+.logic-group-label {
+  font-family: "Segoe UI", sans-serif;
+  font-weight: 600;
+  pointer-events: none;
+  display: none;
+}
+
+/* Label detail is switched by the viewport scale: the classes are set on the
+   SVG root, and what is left out is too small to read at that scale. */
+.logic-vertex-label,
+.logic-vertex-sub,
+.logic-edge-label {
+  font-family: "Segoe UI", sans-serif;
+  pointer-events: none;
+  display: none;
+}
+
+.logic-vertex-sub {
+  fill: var(--text-muted);
+}
+
+svg.lod-node .logic-group-label {
+  display: block;
+}
+
+svg.lod-name .logic-vertex-label,
+svg.lod-name .logic-edge-label {
+  display: block;
+}
+
+svg.lod-rate .logic-vertex-sub {
+  display: block;
+}
+
+.logic-rate-mismatch {
+  fill: #dc3545;
+  pointer-events: none;
+}
+
+.logic-edge {
+  fill: none;
+}
+
+.logic-edge-trigger {
+  stroke: var(--text-muted);
+}
+
+/* --- Logic Diagram toolbar --- */
+.logic-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  font-size: 11px;
+  color: var(--text-primary);
+}
+
+.logic-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.logic-toolbar-label {
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.logic-btn {
+  padding: 2px 7px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.logic-btn:hover {
+  border-color: var(--border-hover);
+}
+
+.logic-btn.active {
+  border-color: var(--highlight);
+  background: var(--highlight-bg);
+}
+
+.logic-select {
+  max-width: 260px;
+  padding: 2px 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.logic-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.logic-counters {
+  color: var(--text-muted);
+}
+
+.logic-legend summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.chain-warn {
+  color: var(--error-color);
+}
+
+.logic-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--text-secondary);
+}
+
+.logic-legend-note {
+  margin-top: 4px;
+  color: var(--text-muted);
 }
 
 /* --- Sequence Diagram Integrated Styles --- */
