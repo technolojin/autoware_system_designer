@@ -286,16 +286,9 @@ class LinkManager:
         else:
             cfg_list = getattr(self.instance.configuration, "outputs", []) or []
 
-        declared_roles = {item.name: item.port_role for item in cfg_list}
-        if port_obj.name not in declared_roles:
-            raise ValidationError(self._err_external_decl(kind, port_obj.name, sorted(declared_roles)))
-
-        declared_role = declared_roles[port_obj.name]
-        if port_obj.role and declared_role and port_obj.role != declared_role:
-            raise ValidationError(
-                f"[E_EXT_DECL_KIND] External port '{port_obj.name}' declared as {declared_role} "
-                f"but connected as {port_obj.role}"
-            )
+        declared_names = [item.name for item in cfg_list]
+        if port_obj.name not in declared_names:
+            raise ValidationError(self._err_external_decl(kind, port_obj.name, sorted(declared_names)))
 
         existing = port_dict.get(port_obj.name)
         if existing:
