@@ -147,12 +147,14 @@ autoware-system-designer-studio serve \
     --bag-dir /data/bags \         # where the bag of a dropped file is searched, beside the replay logs (repeatable)
     --log-root /data/asd_logs \    # run logs: launch/, replay/ (default: /tmp/autoware_system_designer_logs)
     --config-root ~/asd \          # kept files: records/, replay_setups/ (default: ~/.autoware/system_designer)
-    --port 8780 \                  # 0 picks a free port
+    --port 8780 \                  # 0 picks a free port (default: the environment's daemon port, else 8780)
+    --ee-architecture TypeAlphaBridge \  # E/E architecture the systems are deployed on, see E/E architecture
+    --environment ecu_a/host \     # execution environment of the architecture this daemon runs in
     --workspace . \                # colcon workspace builds run in (default: install parent holding src/)
-    --compute-unit main_ecu \      # units local to this daemon (repeatable; default: every onboard unit)
+    --compute-unit main_ecu \      # units local to this daemon (repeatable; default: the environment's, else every onboard unit)
     --peer sub_ecu=http://127.0.0.1:8782 \  # daemon serving another unit (repeatable), see Peers
     --peer-ssh sub_ecu=sub-ecu \   # SSH destination a peer on another device is forwarded from
-    --site-file bench.site.yaml \  # peer bindings of a site (default: $AUTOWARE_SYSTEM_DESIGNER_SITE_FILE)
+    --site-file bench.site.yaml \  # architecture, environment and peer bindings of a site (default: $AUTOWARE_SYSTEM_DESIGNER_SITE_FILE)
     --env-script install/setup.bash \  # sourced once into the environment launch jobs run in
     --rviz-config autoware.rviz    # opened by rviz.start (default: autoware_launch's autoware.rviz)
 ```
@@ -495,6 +497,36 @@ shell, or pass `--env-script` with a setup script, sourced once at start into th
 Without `ROS_DISTRO` in that environment `launch.start` and `rviz.start` answer `unavailable`. RViz
 also needs the display of that environment (`DISPLAY` or `WAYLAND_DISPLAY`).
 
+### E/E architecture
+
+An export carries the [E/E architectures](../autoware_system_designer.instructions.md) its
+deployments table lists, with every compute unit bound to an execution environment. A daemon told
+the architecture and the environment it runs in takes its place from them:
+
+```bash
+autoware-system-designer-studio serve --ee-architecture TypeAlphaBridge --environment ecu_a/host
+```
+
+| From the architecture | The daemon                                                                                   |
+| --------------------- | -------------------------------------------------------------------------------------------- |
+| Bindings              | serves the compute units bound to its environment, over every system declared for it         |
+| `daemon_port`         | listens on its environment's port                                                            |
+| `main_environment`    | in that environment, has the daemons of the other environments as [peers](#peers)            |
+| Network namespace     | reaches a peer sharing its own on the peer's loopback port, any other through an SSH forward |
+| Addresses             | forwards from the peer environment's address, user, port and keys from the SSH configuration |
+
+The same two names come from the site file (`ee_architecture`, `environment`), which the flags
+replace. `--port`, `--compute-unit`, `--peer` and `--peer-ssh` and the site file's `peers` replace
+what the architecture gives, unit by unit. Without an architecture the daemon serves every onboard
+unit, or the ones `--compute-unit` names. `health` reports the place under `ee_architecture`
+(`name`, `environment`, `main`, `port`, `compute_units`, `peers`), and
+
+```bash
+autoware-system-designer-studio environment --ee-architecture TypeAlphaBridge --environment ecu_a/host
+```
+
+prints the same record without serving.
+
 ### Peers
 
 One daemon runs per execution environment and serves the compute units in it. A daemon given the
@@ -507,8 +539,9 @@ autoware-system-designer-studio serve --port 8781 --compute-unit main_ecu \
 
 A binding names a compute unit and the `http://127.0.0.1:<port>` its daemon answers on; a peer checks
 `Host` like any daemon, so the address is the peer's own loopback port or a forward that keeps the
-port, and never the port of the daemon given the binding. Bindings also come from a site file,
-which a `--peer` of the same unit replaces:
+port, and never the port of the daemon given the binding. Bindings come from the
+[E/E architecture](#ee-architecture) when the daemon is given one, and from a site file; a site
+file's binding replaces the architecture's, a `--peer` of the same unit both:
 
 ```yaml
 peers:
@@ -563,7 +596,8 @@ for a peer reached directly.
 
 ### Multi-unit environment
 
-[`demo/docker_multi_unit`](../demo/docker_multi_unit/README.md) runs the daemons of the demo system
-`TypeAlpha` in Docker containers, as containers of one ECU, as separate ECUs reached over SSH, or
-as a mix of both, one daemon peered with the others in each, with tests that drive them through its
-API and cut devices off.
+[`demo/docker_multi_unit`](../demo/docker_multi_unit/README.md) runs one daemon per execution
+environment of the demo system `TypeAlpha` in Docker containers, on the stand-in of each of its
+E/E architectures: containers of one ECU, separate ECUs reached over SSH, and mixes of both. Each
+daemon is given its architecture and environment only, with tests that drive the units through the
+main daemon's API and cut devices off.

@@ -2,6 +2,11 @@ autoware_system_design_format: 0.4.0
 
 base: TypeAlpha.system
 
+ee_architectures:
+  - TypeAlphaHost.ee_architecture
+  - TypeAlphaBridge.ee_architecture
+  - TypeAlphaBridge_two_ecus.ee_architecture
+
 deploy_list:
   - name: vehicle_x
     arguments:

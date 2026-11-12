@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from autoware_system_designer.builder.config.config_registry import ConfigRegistry, format_duplicate_report
 from autoware_system_designer.builder.deployment_instance import DeploymentInstance
+from autoware_system_designer.builder.ee_architecture import resolve_ee_architecture
 from autoware_system_designer.builder.export.instance_to_json import collect_system_structure
 from autoware_system_designer.builder.export.json_io import (
     iter_mode_data,
@@ -66,7 +67,11 @@ from autoware_system_designer.model import serde
 from autoware_system_designer.model.config import NodeConfig, SystemConfig
 from autoware_system_designer.model.export_schema import SCHEMA_VERSION
 from autoware_system_designer.parser.data_validator import split_package_qualifier
-from autoware_system_designer.parser.deployment_parser import peek_target_system_name, resolve_input_target
+from autoware_system_designer.parser.deployment_parser import (
+    deployment_ee_architectures,
+    peek_target_system_name,
+    resolve_input_target,
+)
 from autoware_system_designer.parser.yaml_parser import yaml_parser
 
 logger = logging.getLogger(__name__)
@@ -86,6 +91,8 @@ class BuildArtifacts:
     mode_keys: List[str] = field(default_factory=list)
     # Compute units declared by the system; empty for designs that only tag components.
     compute_units: List[Dict[str, Any]] = field(default_factory=list)
+    # E/E architectures the deployment declares the system for, resolved against its compute units.
+    ee_architectures: List[Dict[str, Any]] = field(default_factory=list)
     file_package_map: Dict[str, str] = field(default_factory=dict)
     package_resolution_by_name: Dict[str, Optional[str]] = field(default_factory=dict)
     packages_without_provider: List[str] = field(default_factory=list)
@@ -136,6 +143,7 @@ def load_build_artifacts(output_root_dir: str, system_name: str) -> BuildArtifac
         default_mode=payload.get("default_mode", "default"),
         mode_keys=payload.get("mode_keys", []),
         compute_units=payload.get("compute_units", []),
+        ee_architectures=payload.get("ee_architectures", []),
         file_package_map=payload.get("file_package_map", {}),
         package_resolution_by_name=payload.get("package_resolution_by_name", {}),
         packages_without_provider=payload.get("packages_without_provider", []),
@@ -158,6 +166,7 @@ class DeploymentBuilder:
             system_config, deploy_variants, _table_path = self._resolve_target(self.deploy_config)
             artifacts = self._init_artifacts(system_config, deploy_variants)
             self._check_deploy_arguments(artifacts)
+            self._resolve_ee_architectures(system_config, artifacts)
             self._build_modes(system_config, artifacts)
             self._check_used_duplicates()
             self._check_undefined_variables(artifacts)
@@ -250,6 +259,17 @@ class DeploymentBuilder:
             file_package_map=self.config_registry.file_package_map,
             config_registry=self.config_registry,
         )
+
+    def _resolve_ee_architectures(self, system_config: SystemConfig, artifacts: BuildArtifacts) -> None:
+        names = deployment_ee_architectures(self.deploy_config.deployment_file)
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise ValidationError(
+                f"E/E architecture(s) {duplicates} are listed more than once in the deployments table"
+            )
+        artifacts.ee_architectures = [
+            resolve_ee_architecture(self.config_registry.get_ee_architecture(name), system_config) for name in names
+        ]
 
     def _export_workspace_root(self) -> Optional[str]:
         """Token base for exported paths; None when the export tree sits outside the workspace.

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type
 
 from autoware_system_designer.builder.resolution.variant_resolver import (
+    EeArchitectureVariantResolver,
     ModuleVariantResolver,
     NodeVariantResolver,
     SystemVariantResolver,
@@ -39,6 +40,7 @@ from autoware_system_designer.model.config import (
     Config,
     ConfigSubType,
     ConfigType,
+    EeArchitectureConfig,
     ModuleConfig,
     NodeConfig,
     ParameterSetConfig,
@@ -454,6 +456,16 @@ class ConfigRegistry:
             self.get_system,
         )
 
+    def get_ee_architecture(self, name: str) -> EeArchitectureConfig:
+        """Get an E/E architecture entity by name. Resolves base/variant if applicable."""
+        return self._get_entity_with_base(
+            name,
+            ConfigType.EE_ARCHITECTURE,
+            ValidationError,
+            EeArchitectureVariantResolver,
+            self.get_ee_architecture,
+        )
+
     def get_entity_by_type(self, name: str, entity_type: str) -> Config:
         """Get an entity by name and type."""
         if entity_type == ConfigType.NODE:
@@ -464,6 +476,8 @@ class ConfigRegistry:
             return self.get_parameter_set(name)
         elif entity_type == ConfigType.SYSTEM:
             return self.get_system(name)
+        elif entity_type == ConfigType.EE_ARCHITECTURE:
+            return self.get_ee_architecture(name)
         else:
             raise ValidationError(f"Unknown entity type: {entity_type}")
 

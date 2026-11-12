@@ -19,6 +19,7 @@ Follow this directory structure for consistency (not mandatory).
 - **Modules**: `src/<package_name>/design/module/` (suffix: `.module.yaml`)
 - **Systems**: `src/<package_name>/design/system/` (suffix: `.system.yaml`)
 - **Parameter Sets**: `src/<package_name>/design/parameter_set/` (suffix: `.parameter_set.yaml`)
+- **E/E Architectures**: `src/<package_name>/design/ee_architecture/` (suffix: `.ee_architecture.yaml`)
 
 ## 4. Configuration Entities & Schemas
 
@@ -256,6 +257,58 @@ Overrides parameters for specific nodes within the system hierarchy.
     - `type`: Parameter type (`bool`, `int`, `double`, `string`, etc.).
     - `value`: Override value (not `default`).
 
+### 4.5. E/E Architecture Configuration (`.ee_architecture.yaml`)
+
+Describes the hardware a system is deployed on and binds each compute unit to an execution environment. A system design names compute units only; an E/E architecture names devices and compute units only, never components. The same system runs on another architecture without a change to its design.
+**Fields:**
+
+- `autoware_system_design_format`: Must be a version up to the supported `DESIGN_FORMAT_VERSION`.
+- `name`: Must match filename.
+- `description`: (Optional) Brief explanation of the architecture.
+- `networks`: (Optional) Networks the devices are connected by.
+  - `name`: Network identifier (`^[a-z][a-z0-9_]*$`).
+  - `subnet`: (Optional) Address range in CIDR notation (e.g., `192.168.30.0/24`); interface addresses on the network lie inside it.
+  - `description`: (Optional) Brief explanation of the network.
+- `devices`: Devices of the vehicle.
+  - `name`: Device identifier (`^[a-z][a-z0-9_]*$`).
+  - `hardware`: (Optional) Hardware class (e.g., `x86_64`, `jetson_orin`).
+  - `description`: (Optional) Brief explanation of the device.
+  - `interfaces`: (Optional) Network interfaces.
+    - `name`: Interface name on the device (e.g., `eth0`).
+    - `network`: Name of a declared network.
+    - `address`: (Optional) Fixed address, the same on every vehicle of the architecture.
+  - `environments`: Execution environments on the device; at least one.
+    - `name`: Environment identifier (`^[a-z][a-z0-9_]*$`); referenced as `<device>/<environment>`.
+    - `kind`: (Optional) `host` (default, the device's operating system), `container` or `vm`.
+    - `network`: (Optional) `host` (default) shares the device's network namespace, loopback included; `own` has its own network namespace.
+    - `address`: Fixed address of an environment whose `network` is `own`; not allowed otherwise.
+    - `shared_memory`: (Optional) `true` when the environment shares the device's shared memory with the other environments of the device that set it. Default `false`.
+    - `daemon_port`: Loopback port of the environment's studio daemon. Required, and distinct, once compute units are bound to more than one environment.
+    - `description`: (Optional) Brief explanation of the environment.
+- `main_environment`: `<device>/<environment>` whose daemon serves the compute units of the other environments. Required once compute units are bound to more than one environment.
+- `bindings`: Environment of each compute unit.
+  - `compute_unit`: Name of an `onboard` compute unit of the system.
+  - `environment`: `<device>/<environment>` the unit is launched in. Several units may share one environment.
+
+A deployments table lists the architectures its system is deployed on under `ee_architectures`. Each is checked against the system and exported with it:
+
+```yaml
+base: TypeAlpha.system
+ee_architectures:
+  - TypeAlphaBridge.ee_architecture
+deploy_list:
+  - name: vehicle_x
+```
+
+**Rules:**
+
+- Every `onboard` compute unit of the system is bound exactly once; `offboard` units are not bound.
+- Addresses are unique within the architecture.
+- An environment outside the main environment's network namespace has an address: its own, or an interface address of its device, preferring a network the main environment's device is on.
+- A connection between compute units in different environments of one device, where not both set `shared_memory`, warns to disable the DDS shared memory transport there.
+
+A variant (`base`) replaces `networks` and `devices` by `name` and `bindings` by `compute_unit` under `override`, sets `main_environment` there, and drops entries under `remove` (see Section 5).
+
 ## 5. Base-Variant Pattern
 
 The Autoware System Designer supports a base-variant pattern that allows you to define a base configuration and then create variants that inherit from it. This pattern is useful for creating reusable configurations, reducing duplication, and creating mode-specific configurations (e.g., Runtime vs. Simulation) or vehicle-specific variants.
@@ -448,6 +501,41 @@ parameters:
       - name: build_only
         type: bool
         value: false
+```
+
+### E/E Architecture Example (0.5.0)
+
+```yaml
+autoware_system_design_format: 0.5.0
+name: TypeAlphaBridge.ee_architecture
+networks:
+  - name: vehicle
+    subnet: 172.30.87.0/24
+devices:
+  - name: ecu_a
+    hardware: x86_64
+    interfaces:
+      - name: eth0
+        network: vehicle
+        address: 172.30.87.11
+    environments:
+      - name: host
+        daemon_port: 8781
+  - name: ecu_b
+    hardware: x86_64
+    interfaces:
+      - name: eth0
+        network: vehicle
+        address: 172.30.87.12
+    environments:
+      - name: host
+        daemon_port: 8782
+main_environment: ecu_a/host
+bindings:
+  - compute_unit: main_ecu
+    environment: ecu_a/host
+  - compute_unit: sub_ecu_1
+    environment: ecu_b/host
 ```
 
 ## 8. Build System Functions

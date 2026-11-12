@@ -1,0 +1,35 @@
+autoware_system_design_format: 0.5.0
+
+name: TypeAlphaBridge_two_ecus.ee_architecture
+
+description: TypeAlphaBridge without ecu_b; its compute unit runs in a second container of ecu_a.
+
+base: TypeAlphaBridge.ee_architecture
+
+remove:
+  devices:
+    - name: ecu_b
+
+override:
+  devices:
+    - name: ecu_a
+      hardware: x86_64
+      interfaces:
+        - name: eth0
+          network: vehicle
+          address: 172.30.87.11
+      environments:
+        - name: main
+          kind: container
+          shared_memory: true
+          daemon_port: 8781
+        - name: sub_1
+          kind: container
+          shared_memory: true
+          daemon_port: 8782
+  main_environment: ecu_a/main
+  bindings:
+    - compute_unit: main_ecu
+      environment: ecu_a/main
+    - compute_unit: sub_ecu_1
+      environment: ecu_a/sub_1

@@ -327,5 +327,13 @@ def get_semantic_checks(
                 message_prefix="Variant rule",
             ),
         )
+    elif entity_type == "ee_architecture":
+        return (
+            _format_version_semantics,
+            _variant_forbidden_root_fields_semantics(
+                forbidden_fields=("networks", "devices", "bindings", "main_environment"),
+                message_prefix="Variant rule",
+            ),
+        )
     else:
         return (_format_version_semantics,)

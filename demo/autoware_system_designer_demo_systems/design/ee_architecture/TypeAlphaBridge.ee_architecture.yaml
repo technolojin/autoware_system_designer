@@ -1,0 +1,48 @@
+autoware_system_design_format: 0.5.0
+
+name: TypeAlphaBridge.ee_architecture
+
+description: Three ECUs on one vehicle network, one compute unit on each.
+
+networks:
+  - name: vehicle
+    subnet: 172.30.87.0/24
+
+devices:
+  - name: ecu_a
+    hardware: x86_64
+    interfaces:
+      - name: eth0
+        network: vehicle
+        address: 172.30.87.11
+    environments:
+      - name: host
+        daemon_port: 8781
+  - name: ecu_b
+    hardware: x86_64
+    interfaces:
+      - name: eth0
+        network: vehicle
+        address: 172.30.87.12
+    environments:
+      - name: host
+        daemon_port: 8782
+  - name: ecu_c
+    hardware: x86_64
+    interfaces:
+      - name: eth0
+        network: vehicle
+        address: 172.30.87.13
+    environments:
+      - name: host
+        daemon_port: 8783
+
+main_environment: ecu_a/host
+
+bindings:
+  - compute_unit: main_ecu
+    environment: ecu_a/host
+  - compute_unit: sub_ecu_1
+    environment: ecu_b/host
+  - compute_unit: sub_ecu_2
+    environment: ecu_c/host

@@ -1,0 +1,324 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "E/E Architecture Entity Schema 0.5.0",
+  "description": "Schema for autoware_system_design_format E/E architecture entities",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "autoware_system_design_format": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_]+\\.ee_architecture$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "base": {
+      "type": "string"
+    },
+    "override": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "networks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "description": {
+                "type": "string"
+              },
+              "subnet": {
+                "type": "string",
+                "description": "Address range of the network in CIDR notation (e.g. 192.168.30.0/24)"
+              }
+            }
+          }
+        },
+        "devices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "environments"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "description": {
+                "type": "string"
+              },
+              "hardware": {
+                "type": "string",
+                "description": "Hardware class of the device (e.g. x86_64, jetson_orin)"
+              },
+              "interfaces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["name", "network"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Interface name on the device (e.g. eth0, mgbe1)"
+                    },
+                    "network": {
+                      "type": "string",
+                      "description": "Name of a declared network"
+                    },
+                    "address": {
+                      "type": "string",
+                      "description": "Fixed address of the interface, the same on every vehicle"
+                    }
+                  }
+                }
+              },
+              "environments": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["name"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["host", "container", "vm"],
+                      "description": "host: the device's operating system; container, vm: an isolated environment on it"
+                    },
+                    "network": {
+                      "type": "string",
+                      "enum": ["host", "own"],
+                      "description": "host (default): shares the device's network namespace, loopback included; own: has its own network namespace and address"
+                    },
+                    "address": {
+                      "type": "string",
+                      "description": "Fixed address of an environment with its own network"
+                    },
+                    "shared_memory": {
+                      "type": "boolean",
+                      "description": "Shares the device's shared memory with the other environments of the device that set it (default false)"
+                    },
+                    "daemon_port": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535,
+                      "description": "Loopback port of the environment's studio daemon"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["compute_unit", "environment"],
+            "additionalProperties": false,
+            "properties": {
+              "compute_unit": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "environment": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*/[a-z][a-z0-9_]*$",
+                "description": "<device>/<environment>"
+              }
+            }
+          }
+        },
+        "main_environment": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*/[a-z][a-z0-9_]*$",
+          "description": "<device>/<environment> whose daemon serves the units of the other environments"
+        }
+      }
+    },
+    "remove": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "networks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"]
+          }
+        },
+        "devices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"]
+          }
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["compute_unit"]
+          }
+        }
+      }
+    },
+    "networks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "description": {
+            "type": "string"
+          },
+          "subnet": {
+            "type": "string",
+            "description": "Address range of the network in CIDR notation (e.g. 192.168.30.0/24)"
+          }
+        }
+      }
+    },
+    "devices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "environments"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "description": {
+            "type": "string"
+          },
+          "hardware": {
+            "type": "string",
+            "description": "Hardware class of the device (e.g. x86_64, jetson_orin)"
+          },
+          "interfaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "network"],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Interface name on the device (e.g. eth0, mgbe1)"
+                },
+                "network": {
+                  "type": "string",
+                  "description": "Name of a declared network"
+                },
+                "address": {
+                  "type": "string",
+                  "description": "Fixed address of the interface, the same on every vehicle"
+                }
+              }
+            }
+          },
+          "environments": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["name"],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": ["host", "container", "vm"],
+                  "description": "host: the device's operating system; container, vm: an isolated environment on it"
+                },
+                "network": {
+                  "type": "string",
+                  "enum": ["host", "own"],
+                  "description": "host (default): shares the device's network namespace, loopback included; own: has its own network namespace and address"
+                },
+                "address": {
+                  "type": "string",
+                  "description": "Fixed address of an environment with its own network"
+                },
+                "shared_memory": {
+                  "type": "boolean",
+                  "description": "Shares the device's shared memory with the other environments of the device that set it (default false)"
+                },
+                "daemon_port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "description": "Loopback port of the environment's studio daemon"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["compute_unit", "environment"],
+        "additionalProperties": false,
+        "properties": {
+          "compute_unit": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "environment": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*/[a-z][a-z0-9_]*$",
+            "description": "<device>/<environment>"
+          }
+        }
+      }
+    },
+    "main_environment": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*/[a-z][a-z0-9_]*$",
+      "description": "<device>/<environment> whose daemon serves the units of the other environments"
+    }
+  },
+  "additionalProperties": false,
+  "if": {
+    "not": {
+      "required": ["base"]
+    }
+  },
+  "then": {
+    "required": ["devices", "bindings"]
+  }
+}

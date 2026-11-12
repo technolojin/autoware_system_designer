@@ -133,11 +133,12 @@ class ConfigType:
     MODULE = "module"
     PARAMETER_SET = "parameter_set"
     SYSTEM = "system"
+    EE_ARCHITECTURE = "ee_architecture"
 
     @classmethod
     def get_all_types(cls) -> List[str]:
         """Get all valid entity types."""
-        return [cls.NODE, cls.MODULE, cls.PARAMETER_SET, cls.SYSTEM]
+        return [cls.NODE, cls.MODULE, cls.PARAMETER_SET, cls.SYSTEM, cls.EE_ARCHITECTURE]
 
 
 class ConfigSubType:
@@ -222,3 +223,19 @@ class SystemConfig(Config):
     variable_files: Optional[List[VariableFileDict]] = None
     node_groups: Optional[List[NodeGroupDict]] = None
     remaps: Optional[List[RemapEntry]] = None
+
+
+@dataclass
+class EeArchitectureConfig(Config):
+    """Data structure for E/E architecture entities.
+
+    The physical side of a deployment: networks, devices with their execution
+    environments, and the binding of each compute unit to one environment. It
+    names compute units only, never components.
+    """
+
+    base: Optional[str] = None  # Parent entity name for variants
+    networks: Optional[List[Dict[str, Any]]] = None
+    devices: Optional[List[Dict[str, Any]]] = None
+    bindings: Optional[List[Dict[str, Any]]] = None
+    main_environment: Optional[str] = None

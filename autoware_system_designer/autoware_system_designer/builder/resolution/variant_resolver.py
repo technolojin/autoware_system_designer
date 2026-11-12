@@ -16,7 +16,14 @@ import logging
 from typing import Any, Callable, Dict, List, Optional
 
 from autoware_system_designer.builder.resolution.connection_resolver import filter_connections_by_removed_entities
-from autoware_system_designer.model.config import ComputeUnit, ModuleConfig, NodeConfig, RemapEntry, SystemConfig
+from autoware_system_designer.model.config import (
+    ComputeUnit,
+    EeArchitectureConfig,
+    ModuleConfig,
+    NodeConfig,
+    RemapEntry,
+    SystemConfig,
+)
 from autoware_system_designer.model.domain import ParameterFileDefinition, ParameterValueDefinition, PortDefinition
 
 logger = logging.getLogger(__name__)
@@ -241,6 +248,29 @@ class SystemVariantResolver(VariantResolver):
             {"field": "remaps", "key_field": "source"},
         ]
         self._resolve_removals(system_config, remove_config, remove_specs)
+
+
+class EeArchitectureVariantResolver(VariantResolver):
+    """Resolver for E/E architecture entity variants."""
+
+    _SPECS = [
+        {"field": "networks", "key_field": "name"},
+        {"field": "devices", "key_field": "name"},
+        {"field": "bindings", "key_field": "compute_unit"},
+    ]
+
+    def resolve(self, architecture: EeArchitectureConfig, config_yaml: Dict[str, Any]):
+        """
+        Apply variant rules from config_yaml to architecture.
+        Modifies architecture in-place.
+        """
+        remove_config = config_yaml.get("remove", {})
+        if remove_config:
+            self._resolve_removals(architecture, remove_config, self._SPECS)
+        self._resolve_merges(architecture, config_yaml, self._SPECS)
+        main_environment = (config_yaml.get("override") or {}).get("main_environment")
+        if main_environment:
+            architecture.main_environment = main_environment
 
 
 class NodeVariantResolver(VariantResolver):
