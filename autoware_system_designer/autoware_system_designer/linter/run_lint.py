@@ -31,7 +31,7 @@ from autoware_system_designer.linter import lint_files  # noqa: E402
 def find_yaml_files(paths: List[str]) -> List[Path]:
     """Find all autoware_system_design_format YAML files in given paths."""
     yaml_files = []
-    entity_extensions = [".node.yaml", ".module.yaml", ".system.yaml", ".parameter_set.yaml"]
+    entity_extensions = [".node.yaml", ".module.yaml", ".system.yaml", ".parameter_set.yaml", ".ee_architecture.yaml"]
 
     for path_str in paths:
         path = Path(path_str)

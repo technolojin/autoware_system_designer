@@ -152,6 +152,12 @@ class SystemValidator(BaseValidator):
     ENTITY_TYPE = ConfigType.SYSTEM
 
 
+class EeArchitectureValidator(BaseValidator):
+    """Validator for E/E architecture entities."""
+
+    ENTITY_TYPE = ConfigType.EE_ARCHITECTURE
+
+
 class ValidatorFactory:
     """Factory for creating validators."""
 
@@ -160,6 +166,7 @@ class ValidatorFactory:
         ConfigType.MODULE: ModuleValidator,
         ConfigType.PARAMETER_SET: ParameterSetValidator,
         ConfigType.SYSTEM: SystemValidator,
+        ConfigType.EE_ARCHITECTURE: EeArchitectureValidator,
     }
 
     @classmethod

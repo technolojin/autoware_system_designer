@@ -50,7 +50,7 @@ from autoware_system_designer_runtime.control_protocol import DEFAULT_POLICY, ME
 from .. import exports
 from ..pages import assets
 from ..pages.render import ICON_FILE, INDEX_PAGE, SYSTEMS_DIR, Site, system_pages
-from . import api, browse, build, events, jobs, launch, peers, record_watch, replay, runs, storage
+from . import api, architecture, browse, build, events, jobs, launch, peers, record_watch, replay, runs, storage
 from .events import TOPIC_DAEMON, TOPIC_SYSTEMS_CHANGED
 from .http import (
     CLIENT_HEADER,
@@ -165,6 +165,7 @@ def _error_response(error: api.ApiError, request_id: Any = None, *, with_id: boo
 class ServeDaemon:
     """One daemon instance; ``served_units`` None means every onboard unit is local to it.
 
+    ``environment`` is the daemon's place in an E/E architecture, None when it was given none.
     ``workspace`` is the colcon workspace builds run in, None when this daemon does not build.
     ``launch_env`` is the environment launch jobs run in (this process's when None; see launch.capture_env).
     ``log_root``, ``config_root`` and ``record_root`` override the roots of the settings file at
@@ -179,6 +180,7 @@ class ServeDaemon:
         *,
         port: int,
         served_units: Optional[Iterable[str]] = None,
+        environment: Optional[architecture.EnvironmentBinding] = None,
         workspace: Optional[Path] = None,
         record_root: Optional[Path] = None,
         log_root: Optional[Path] = None,
@@ -195,6 +197,7 @@ class ServeDaemon:
     ) -> None:
         self.install_root = install_root
         self.served_units = None if served_units is None else sorted(set(served_units))
+        self.environment = environment
         self.workspace = workspace
         self.storage = storage.Storage.load(
             settings_path, log_root=log_root, config_root=config_root, record_root=record_root
@@ -377,6 +380,7 @@ class ServeDaemon:
             "started_at": self._started_at,
             "install_root": str(self.install_root),
             "served_units": self.served_units,
+            "ee_architecture": None if self.environment is None else self.environment.to_view(),
             "workspace": None if self.workspace is None else str(self.workspace),
             "record_root": str(self.records.record_root),
             "bag_dirs": [str(directory) for directory in self.bag_dirs],

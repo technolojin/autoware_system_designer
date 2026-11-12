@@ -70,6 +70,9 @@ logger = logging.getLogger(__name__)
 
 SITE_FILE_ENV = "AUTOWARE_SYSTEM_DESIGNER_SITE_FILE"
 SITE_PEERS_KEY = "peers"
+SITE_ARCHITECTURE_KEY = "ee_architecture"
+SITE_ENVIRONMENT_KEY = "environment"
+SITE_PEER_SSH_KEY = "peer_ssh"
 
 PEER_CONNECTING = "connecting"
 PEER_CONNECTED = "connected"
@@ -208,8 +211,7 @@ def site_file_path(explicit: Optional[Path]) -> Optional[Path]:
     return Path(named).expanduser() if named else None
 
 
-def load_site_file(path: Path) -> list[PeerSpec]:
-    """Peer bindings of a site file."""
+def _read_site_file(path: Path) -> dict[str, Any]:
     import yaml
 
     try:
@@ -217,9 +219,41 @@ def load_site_file(path: Path) -> list[PeerSpec]:
     except (OSError, yaml.YAMLError) as exc:
         raise PeerConfigError(f"cannot read site file {path}: {exc}") from exc
     if content is None:
-        return []
+        return {}
     if not isinstance(content, dict):
         raise PeerConfigError(f"site file {path} must be a mapping")
+    return content
+
+
+def load_site_environment(path: Path) -> tuple[Optional[str], Optional[str]]:
+    """E/E architecture of the site and the environment of this daemon, as a site file names them."""
+    content = _read_site_file(path)
+    architecture, environment = content.get(SITE_ARCHITECTURE_KEY), content.get(SITE_ENVIRONMENT_KEY)
+    for key, value in ((SITE_ARCHITECTURE_KEY, architecture), (SITE_ENVIRONMENT_KEY, environment)):
+        if value is not None and not isinstance(value, str):
+            raise PeerConfigError(f"site file {path}: {key} must be a name")
+    return architecture, environment
+
+
+def load_site_peer_ssh(path: Path) -> list[tuple[str, str]]:
+    """SSH destinations a site file gives the peers of compute units, whatever names their URL."""
+    bindings = _read_site_file(path).get(SITE_PEER_SSH_KEY) or {}
+    if not isinstance(bindings, dict):
+        raise PeerConfigError(f"site file {path}: {SITE_PEER_SSH_KEY} must map compute units to SSH destinations")
+    found = []
+    for unit, destination in bindings.items():
+        if not isinstance(unit, str) or not isinstance(destination, str):
+            raise PeerConfigError(f"site file {path}: {SITE_PEER_SSH_KEY} of {unit!r} must be a destination")
+        try:
+            found.append((unit, parse_destination(destination)))
+        except PeerConfigError as exc:
+            raise PeerConfigError(f"site file {path}: {exc}") from exc
+    return found
+
+
+def load_site_file(path: Path) -> list[PeerSpec]:
+    """Peer bindings of a site file."""
+    content = _read_site_file(path)
     peers = content.get(SITE_PEERS_KEY) or {}
     if not isinstance(peers, dict):
         raise PeerConfigError(f"site file {path}: {SITE_PEERS_KEY} must map compute units to peers")

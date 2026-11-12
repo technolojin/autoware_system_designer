@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import re
 import signal
@@ -25,9 +26,9 @@ import sys
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
-from .exports import resolve_install_root
+from .exports import discover_systems, resolve_install_root
 from .pack import PackError, pack
-from .serve import peers
+from .serve import architecture, peers
 from .serve.build import resolve_workspace
 from .serve.launch import LaunchEnvError, capture_env
 from .serve.server import BIND_HOST, HEARTBEAT_INTERVAL_S, ServeDaemon
@@ -73,14 +74,18 @@ def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
         "without one, builds are unavailable)",
     )
     serve.add_argument(
-        "--port", type=int, default=DEFAULT_PORT, help=f"TCP port, 0 picks a free one (default {DEFAULT_PORT})"
+        "--port",
+        type=int,
+        help=f"TCP port, 0 picks a free one (default: the environment's daemon port, else {DEFAULT_PORT})",
     )
+    _add_environment(serve)
     serve.add_argument(
         "--compute-unit",
         dest="compute_units",
         action="append",
         type=_unit_name,
-        help="compute unit local to this daemon (repeatable; default: every onboard unit)",
+        help="compute unit local to this daemon (repeatable; default: the units bound to the environment, "
+        "else every onboard unit)",
     )
     serve.add_argument(
         "--peer",
@@ -102,7 +107,8 @@ def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
     serve.add_argument(
         "--site-file",
         type=Path,
-        help=f"YAML file binding compute units to peer daemons under 'peers' (default: ${peers.SITE_FILE_ENV})",
+        help="YAML file naming 'ee_architecture' and 'environment' of this daemon and binding compute units to "
+        f"peer daemons under 'peers' (default: ${peers.SITE_FILE_ENV})",
     )
     serve.add_argument(
         "--env-script",
@@ -153,9 +159,19 @@ def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
         help="system to include, by name or package:name (repeatable; default: every exported system)",
     )
 
+    environment = commands.add_parser(
+        "environment", help="print what an E/E architecture gives the daemon of an environment, as JSON"
+    )
+    _add_common(environment)
+    _add_environment(environment)
+
     args = parser.parse_args(argv)
+    if (args.command in ("serve", "environment")) and (args.ee_architecture is None) != (args.environment is None):
+        parser.error("--ee-architecture and --environment go together")
+    if args.command == "environment" and args.ee_architecture is None:
+        parser.error("--ee-architecture and --environment are required")
     if args.command == "serve":
-        if not 0 <= args.port <= 65535:
+        if args.port is not None and not 0 <= args.port <= 65535:
             serve.error("--port must be within 0..65535")
         if args.rviz_config is not None and not args.rviz_config.is_file():
             serve.error(f"--rviz-config {args.rviz_config} is not a file")
@@ -163,13 +179,61 @@ def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
             serve.error("--heartbeat-interval must be positive")
         try:
             site_file = peers.site_file_path(args.site_file)
-            from_file = [] if site_file is None else peers.load_site_file(site_file)
-            args.peer_specs = peers.merge_specs(from_file, [peers.parse_peer(text) for text in args.peers])
-            args.peer_specs = peers.with_ssh(args.peer_specs, [peers.parse_peer_ssh(text) for text in args.peer_ssh])
-            peers.validate_specs(args.peer_specs, args.compute_units or (), args.port)
+            args.site_peers = [] if site_file is None else peers.load_site_file(site_file)
+            args.flag_peers = [peers.parse_peer(text) for text in args.peers]
+            args.flag_peer_ssh = [peers.parse_peer_ssh(text) for text in args.peer_ssh]
+            if site_file is not None:
+                args.flag_peer_ssh = peers.load_site_peer_ssh(site_file) + args.flag_peer_ssh
+            if site_file is not None and args.ee_architecture is None:
+                args.ee_architecture, args.environment = peers.load_site_environment(site_file)
+                if (args.ee_architecture is None) != (args.environment is None):
+                    serve.error(f"site file {site_file}: ee_architecture and environment go together")
+            # With an architecture the bindings are complete once the exports are read.
+            if args.ee_architecture is None:
+                args.peer_specs = _peer_specs(args, (), args.compute_units or (), _port(args, None))
         except peers.PeerConfigError as exc:
             serve.error(str(exc))
     return args
+
+
+def _port(args: argparse.Namespace, binding: Optional[architecture.EnvironmentBinding]) -> int:
+    if args.port is not None:
+        return args.port
+    return DEFAULT_PORT if binding is None or binding.port is None else binding.port
+
+
+def _peer_specs(
+    args: argparse.Namespace, derived: Sequence[peers.PeerSpec], local_units: Sequence[str], port: int
+) -> list[peers.PeerSpec]:
+    """Peer bindings of the daemon: the architecture's, replaced unit by unit by the site file's and the flags'."""
+    specs = peers.merge_specs(derived, args.site_peers, args.flag_peers)
+    specs = peers.with_ssh(specs, args.flag_peer_ssh)
+    peers.validate_specs(specs, local_units, port)
+    return specs
+
+
+def _add_environment(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--ee-architecture",
+        metavar="NAME",
+        help="E/E architecture the exported systems are deployed on; with --environment it gives the daemon "
+        "its compute units, its port and, in the main environment, its peers",
+    )
+    parser.add_argument(
+        "--environment",
+        metavar="DEVICE/ENVIRONMENT",
+        help="execution environment of the E/E architecture this daemon runs in",
+    )
+
+
+def _environment_binding(args: argparse.Namespace, install_root: Path) -> Optional[architecture.EnvironmentBinding]:
+    if args.ee_architecture is None:
+        return None
+    systems, _ = discover_systems(install_root)
+    try:
+        return architecture.resolve(systems, args.ee_architecture, args.environment)
+    except architecture.ArchitectureError as exc:
+        sys.exit(str(exc))
 
 
 async def _serve(daemon: ServeDaemon) -> None:
@@ -194,25 +258,51 @@ def _install_root(args: argparse.Namespace) -> Path:
 
 def _run_serve(args: argparse.Namespace) -> None:
     install_root = _install_root(args)
+    binding = _environment_binding(args, install_root)
+    port = _port(args, binding)
+    served_units = args.compute_units
+    if binding is None:
+        peer_specs = args.peer_specs
+    else:
+        if served_units is None:
+            served_units = list(binding.units)
+        try:
+            peer_specs = _peer_specs(args, binding.peers, served_units, port)
+        except peers.PeerConfigError as exc:
+            sys.exit(str(exc))
     try:
         launch_env = capture_env(args.env_script)
     except LaunchEnvError as exc:
         sys.exit(str(exc))
     try:
-        daemon = _daemon(args, install_root, launch_env)
+        daemon = _daemon(args, install_root, launch_env, binding, port, served_units, peer_specs)
     except ValueError as exc:
         sys.exit(f"studio settings: {exc}")
     try:
         asyncio.run(_serve(daemon))
     except OSError as exc:
-        sys.exit(f"cannot serve on {BIND_HOST}:{args.port}: {exc}")
+        sys.exit(f"cannot serve on {BIND_HOST}:{port}: {exc}")
 
 
-def _daemon(args: argparse.Namespace, install_root: Path, launch_env: Mapping[str, str]) -> ServeDaemon:
+def _run_environment(args: argparse.Namespace) -> None:
+    binding = _environment_binding(args, _install_root(args))
+    print(json.dumps(binding.to_view(), indent=2), flush=True)
+
+
+def _daemon(
+    args: argparse.Namespace,
+    install_root: Path,
+    launch_env: Mapping[str, str],
+    binding: Optional[architecture.EnvironmentBinding],
+    port: int,
+    served_units: Optional[Sequence[str]],
+    peer_specs: Sequence[peers.PeerSpec],
+) -> ServeDaemon:
     return ServeDaemon(
         install_root,
-        port=args.port,
-        served_units=args.compute_units,
+        port=port,
+        served_units=served_units,
+        environment=binding,
         workspace=resolve_workspace(install_root, args.workspace),
         record_root=args.record_dir,
         bag_dirs=args.bag_dirs,
@@ -221,7 +311,7 @@ def _daemon(args: argparse.Namespace, install_root: Path, launch_env: Mapping[st
         launch_env=launch_env,
         env_script=args.env_script,
         rviz_config=args.rviz_config,
-        peer_specs=args.peer_specs,
+        peer_specs=peer_specs,
         heartbeat_s=args.heartbeat_interval,
     )
 
@@ -244,6 +334,8 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     logging.basicConfig(level=args.log_level, format="[%(levelname)s] %(name)s: %(message)s")
     if args.command == "serve":
         _run_serve(args)
+    elif args.command == "environment":
+        _run_environment(args)
     else:
         _run_pack(args)
 

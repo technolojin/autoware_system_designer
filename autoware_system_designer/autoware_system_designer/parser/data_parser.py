@@ -24,6 +24,7 @@ from autoware_system_designer.model.config import (
     Config,
     ConfigSubType,
     ConfigType,
+    EeArchitectureConfig,
     ModuleConfig,
     NodeConfig,
     ParameterSetConfig,
@@ -335,6 +336,16 @@ class ConfigParser:
                 variable_files=config.get("variable_files"),
                 node_groups=config.get("node_groups"),
                 remaps=[RemapEntry.from_dict(r) for r in raw_remaps],
+            )
+        elif entity_type == ConfigType.EE_ARCHITECTURE:
+            return EeArchitectureConfig(
+                **base_data,
+                base=base_name,
+                sub_type=ConfigSubType.VARIANT if base_name else ConfigSubType.BASE,
+                networks=config.get("networks"),
+                devices=config.get("devices"),
+                bindings=config.get("bindings"),
+                main_environment=config.get("main_environment"),
             )
         else:
             raise ValidationError(f"Unknown entity type: {entity_type}")

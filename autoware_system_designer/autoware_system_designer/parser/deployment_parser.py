@@ -52,7 +52,7 @@ def _resolve_deployments_path(input_path: str) -> str:
     )
 
 
-def _parse_deployments_list(deployments_path: str) -> Tuple[str, List[Dict[str, Any]]]:
+def _parse_deployments_list(deployments_path: str) -> Tuple[str, List[Dict[str, Any]], List[str]]:
     config_yaml = yaml_parser.load_config(deployments_path)
     if not isinstance(config_yaml, dict):
         raise ValidationError(f"Invalid deployments table format: {deployments_path}")
@@ -83,7 +83,13 @@ def _parse_deployments_list(deployments_path: str) -> Tuple[str, List[Dict[str, 
             )
         deploy_list.append({"name": name, "arguments": arguments})
 
-    return base, deploy_list
+    ee_architectures = config_yaml.get("ee_architectures") or []
+    if not isinstance(ee_architectures, list) or not all(isinstance(name, str) and name for name in ee_architectures):
+        raise ValidationError(
+            f"'ee_architectures' must be a list of entity names in deployments table: {deployments_path}"
+        )
+
+    return base, deploy_list, ee_architectures
 
 
 def peek_target_system_name(input_path: str) -> str:
@@ -92,7 +98,7 @@ def peek_target_system_name(input_path: str) -> str:
         return parse_subsystem(input_path).name
     if input_path.endswith(".deployments") or input_path.endswith(".deployments.yaml"):
         table_path = _resolve_deployments_path(input_path)
-        base_name, _ = _parse_deployments_list(table_path)
+        base_name, _, _ = _parse_deployments_list(table_path)
         return _normalize_system_name(base_name)
     return _normalize_system_name(input_path)
 
@@ -115,7 +121,7 @@ def resolve_input_target(
 
     if input_path.endswith(".deployments") or input_path.endswith(".deployments.yaml"):
         table_path = _resolve_deployments_path(input_path)
-        base_name, deploy_list = _parse_deployments_list(table_path)
+        base_name, deploy_list, _ = _parse_deployments_list(table_path)
         system_name = _normalize_system_name(base_name)
         system_config = config_registry.get_system(system_name)
         return system_config, deploy_list, table_path
@@ -123,3 +129,11 @@ def resolve_input_target(
     system_name = _normalize_system_name(input_path)
     system_config = config_registry.get_system(system_name)
     return system_config, [], None
+
+
+def deployment_ee_architectures(input_path: str) -> List[str]:
+    """E/E architecture entities a deployments table declares the system for; none for a system-only target."""
+    if input_path.endswith(".deployments") or input_path.endswith(".deployments.yaml"):
+        _, _, ee_architectures = _parse_deployments_list(_resolve_deployments_path(input_path))
+        return ee_architectures
+    return []

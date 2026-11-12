@@ -32,6 +32,7 @@ class FileLinter:
         ".module.yaml": ConfigType.MODULE,
         ".system.yaml": ConfigType.SYSTEM,
         ".parameter_set.yaml": ConfigType.PARAMETER_SET,
+        ".ee_architecture.yaml": ConfigType.EE_ARCHITECTURE,
     }
 
     def lint(self, file_path: Path, result: LintResult):
