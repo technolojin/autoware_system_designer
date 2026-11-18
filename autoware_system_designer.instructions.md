@@ -220,6 +220,7 @@ Top-level entry point defining the complete system.
   - `name`: Unit identifier referenced by `components[].compute_unit` (e.g., `main_ecu`). Lowercase letters, digits and underscores, starting with a letter (`^[a-z][a-z0-9_]*$`); the name is used as the launcher directory and file name and as the runtime `--compute-unit` value.
   - `kind`: (Optional) Where the unit exists relative to the deployed vehicle. `onboard` (default) runs on the vehicle and gets a launcher; `offboard` is a participant outside the vehicle (infrastructure, cloud, remote operation) whose components are declared for wiring only. Offboard units get no launcher and no launch-command entry; their components remain in the structure export.
   - `description`: (Optional) Brief explanation of the unit.
+  - `requires`: (Optional) Capabilities the unit needs from the execution environment it is launched in (e.g., `[gpu]`). Names are free (`^[a-z][a-z0-9_]*$`); an E/E architecture may bind the unit only to an environment whose `provides` holds every one of them.
 - `components`: Top-level instances.
   - `name`: Name of the component instance.
   - `entity`: Reference to module/node (e.g., `SensingModule.module`).
@@ -283,12 +284,13 @@ Describes the hardware a system is deployed on and binds each compute unit to an
     - `network`: (Optional) `host` (default) shares the device's network namespace, loopback included; `own` has its own network namespace.
     - `address`: Fixed address of an environment whose `network` is `own`; not allowed otherwise.
     - `shared_memory`: (Optional) `true` when the environment shares the device's shared memory with the other environments of the device that set it. Default `false`.
+    - `provides`: (Optional) Capabilities the environment gives the compute units bound to it (e.g., `[gpu]`), matched by name against each unit's `requires`. A capability belongs to the environment, not the device: a container has a GPU only when it is passed through.
     - `daemon_port`: Loopback port of the environment's studio daemon. Required, and distinct, once compute units are bound to more than one environment.
     - `description`: (Optional) Brief explanation of the environment.
 - `main_environment`: `<device>/<environment>` whose daemon serves the compute units of the other environments. Required once compute units are bound to more than one environment.
 - `bindings`: Environment of each compute unit.
   - `compute_unit`: Name of an `onboard` compute unit of the system.
-  - `environment`: `<device>/<environment>` the unit is launched in. Several units may share one environment.
+  - `environment`: `<device>/<environment>` the unit is launched in. Several units may share one environment. The build fails when the environment does not provide a capability the unit requires.
 
 A deployments table lists the architectures its system is deployed on under `ee_architectures`. Each is checked against the system and exported with it:
 
@@ -532,9 +534,9 @@ devices:
         daemon_port: 8782
 main_environment: ecu_a/host
 bindings:
-  - compute_unit: main_ecu
+  - compute_unit: sensing_perception
     environment: ecu_a/host
-  - compute_unit: sub_ecu_1
+  - compute_unit: map_localization
     environment: ecu_b/host
 ```
 

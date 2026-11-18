@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Fixtures of the multi-unit Docker tests: one environment per topology, driven through its main daemon."""
+"""Fixtures of the multi-unit Docker tests: one environment per E/E architecture, driven through its main daemon."""
 
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -33,7 +34,9 @@ import run  # noqa: E402
 
 SYSTEM = "autoware_system_designer_demo_systems:TypeAlpha"
 DEPLOY = "vehicle_x"
-TOPOLOGIES = run.topologies()
+ARCHITECTURES = run.architectures()
+# Architectures with an environment that is this machine's operating system; they need a workspace built here.
+NATIVE_ARCHITECTURES = {"TypeAlphaNativeMain"}
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -41,7 +44,9 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    parser.addoption("--keep", action="store_true", help="leave the containers of the last topology up after the tests")
+    parser.addoption(
+        "--keep", action="store_true", help="leave the containers of the last architecture up after the tests"
+    )
 
 
 def _docker_available() -> bool:
@@ -61,7 +66,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list) -> None:
 
 def pytest_collection_finish(session: pytest.Session) -> None:
     last = session.items[-1] if session.items else None
-    session.config.last_topology = getattr(last, "callspec", None) and last.callspec.params.get("environment")
+    session.config.last_architecture = getattr(last, "callspec", None) and last.callspec.params.get("environment")
 
 
 class RpcError(Exception):
@@ -128,19 +133,21 @@ def wait_for(condition: Callable[[], bool], timeout: float, what: str, period: f
 
 
 class Environment:
-    """One running topology; its main daemon serves the other units through theirs."""
+    """The running stand-in of one E/E architecture; its main daemon serves the other units through theirs."""
 
-    def __init__(self, topology: str):
-        self.topology = topology
-        bindings = run.Topology(topology)
+    def __init__(self, architecture: str):
+        self.architecture = architecture
+        bindings = run.Architecture(architecture)
+        self.bindings = bindings
         self.project = bindings.project
+        self.native = bindings.native is not None
         self.units = [unit.name for unit in bindings.units]
         self.service = {unit.name: unit.service for unit in bindings.units}
         self.address = {unit.name: unit.address for unit in bindings.units}
         self.device = {unit.name: unit.device for unit in bindings.units}
         self.netns = {unit.name: unit.netns for unit in bindings.units}
         # SSH destination of the units on another device than the main daemon's, None for the others.
-        self.ssh = {unit.name: unit.destination if bindings.remote(unit) else None for unit in bindings.units}
+        self.ssh = {unit.name: unit.address if bindings.remote(unit) else None for unit in bindings.units}
         self.main_units = [unit.name for unit in bindings.units if unit.main]
         self.main = Daemon(bindings.main.port)
 
@@ -168,16 +175,19 @@ class Environment:
         return subprocess.run(["docker", *args], capture_output=True, text=True, timeout=60.0, check=False)
 
     def run(self, command: str) -> subprocess.CompletedProcess:
-        """``run.py up`` or ``down`` of the topology."""
-        argv = [sys.executable, run.__file__, command, self.topology]
+        """``run.py up`` or ``down`` of the architecture."""
+        argv = [sys.executable, run.__file__, command, self.architecture]
         return subprocess.run(argv, capture_output=True, text=True, timeout=600.0, check=False)
 
     def compose(self, *args: str) -> subprocess.CompletedProcess:
-        return run.compose(self.topology, *args, capture_output=True, text=True, timeout=120.0)
+        return self.bindings.compose(*args, capture_output=True, text=True, timeout=120.0)
 
     def processes(self, unit: str, pattern: str) -> list:
         """Command lines in the unit's container matching ``pattern``."""
-        result = self.compose("exec", "-T", self.service[unit], "pgrep", "-af", pattern)
+        if self.service[unit] == run.NATIVE:
+            result = subprocess.run(["pgrep", "-af", pattern], capture_output=True, text=True, check=False)
+        else:
+            result = self.compose("exec", "-T", self.service[unit], "pgrep", "-af", pattern)
         return [line for line in result.stdout.splitlines() if "pgrep" not in line]
 
     def all_running(self) -> bool:
@@ -190,17 +200,29 @@ class Environment:
         return True
 
 
-@pytest.fixture(scope="module", params=TOPOLOGIES)
-def environment(request: pytest.FixtureRequest) -> Iterator[Environment]:
+@pytest.fixture(scope="session")
+def workspace() -> None:
+    """The workspace built in the image, with the export the architectures are read from."""
+    built = subprocess.run([sys.executable, run.__file__, "build"], capture_output=True, text=True, check=False)
+    if built.returncode != 0:
+        pytest.fail(f"run.py build failed:\n{built.stdout}\n{built.stderr}")
+
+
+@pytest.fixture(scope="module", params=ARCHITECTURES)
+def environment(request: pytest.FixtureRequest, workspace: None) -> Iterator[Environment]:
+    if os.environ.get("ASD_HOST_DEVICE") and request.param != os.environ.get("ASD_HOST_ARCHITECTURE"):
+        pytest.skip("ASD_HOST_DEVICE is a device of ASD_HOST_ARCHITECTURE alone")
+    if request.param in NATIVE_ARCHITECTURES and not os.environ.get("ASD_NATIVE_INSTALL"):
+        pytest.skip(f"{request.param} runs a daemon on this machine; set ASD_NATIVE_INSTALL")
     env = Environment(request.param)
     up = env.run("up")
     if up.returncode != 0:
         env.run("down")
-        pytest.fail(f"run.py up {env.topology} failed:\n{up.stdout}\n{up.stderr}")
+        pytest.fail(f"run.py up {env.architecture} failed:\n{up.stdout}\n{up.stderr}")
     try:
         yield env
     finally:
-        if not (request.config.getoption("--keep") and request.param == request.config.last_topology):
+        if not (request.config.getoption("--keep") and request.param == request.config.last_architecture):
             env.run("down")
 
 

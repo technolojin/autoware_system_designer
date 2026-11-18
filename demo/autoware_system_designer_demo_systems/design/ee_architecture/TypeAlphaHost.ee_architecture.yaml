@@ -8,25 +8,25 @@ devices:
   - name: ecu
     hardware: x86_64
     environments:
-      - name: main
+      - name: sensing_perception
         kind: container
         shared_memory: true
         daemon_port: 8781
-      - name: sub_1
+      - name: map_localization
         kind: container
         shared_memory: true
         daemon_port: 8782
-      - name: sub_2
+      - name: planning_control
         kind: container
         shared_memory: true
         daemon_port: 8783
 
-main_environment: ecu/main
+main_environment: ecu/sensing_perception
 
 bindings:
-  - compute_unit: main_ecu
-    environment: ecu/main
-  - compute_unit: sub_ecu_1
-    environment: ecu/sub_1
-  - compute_unit: sub_ecu_2
-    environment: ecu/sub_2
+  - compute_unit: sensing_perception
+    environment: ecu/sensing_perception
+  - compute_unit: map_localization
+    environment: ecu/map_localization
+  - compute_unit: planning_control
+    environment: ecu/planning_control

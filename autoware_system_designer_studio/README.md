@@ -154,6 +154,7 @@ autoware-system-designer-studio serve \
     --compute-unit main_ecu \      # units local to this daemon (repeatable; default: the environment's, else every onboard unit)
     --peer sub_ecu=http://127.0.0.1:8782 \  # daemon serving another unit (repeatable), see Peers
     --peer-ssh sub_ecu=sub-ecu \   # SSH destination a peer on another device is forwarded from
+    --ssh-config ~/asd/ssh_config \  # SSH configuration of those forwards (default: the user's)
     --site-file bench.site.yaml \  # architecture, environment and peer bindings of a site (default: $AUTOWARE_SYSTEM_DESIGNER_SITE_FILE)
     --env-script install/setup.bash \  # sourced once into the environment launch jobs run in
     --rviz-config autoware.rviz    # opened by rviz.start (default: autoware_launch's autoware.rviz)
@@ -525,7 +526,10 @@ unit, or the ones `--compute-unit` names. `health` reports the place under `ee_a
 autoware-system-designer-studio environment --ee-architecture TypeAlphaBridge --environment ecu_a/host
 ```
 
-prints the same record without serving.
+prints the same record without serving. Without `--environment` it prints the architecture itself:
+`name`, `main_environment`, `networks`, `devices` and every environment with its device, kind, network
+namespace, address, `daemon_port`, `provides` and compute units, which is what a tool that sets the
+environments up reads.
 
 ### Peers
 
@@ -561,7 +565,8 @@ ssh -N -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=5 -o 
 as a job of kind `tunnel`, one per peer address, started again 1 s to 15 s after it ends. Only the
 running tunnel job stays in `jobs.list`; its log is the output of `ssh`. The destination is a host
 of the SSH configuration of the daemon's user or `[user@]host`; user, port, keys and host key
-checking come from that configuration, and nothing is ever prompted for. A forward that carries no
+checking come from that configuration, or from the file `--ssh-config` names in its place, and
+nothing is ever prompted for. A forward that carries no
 traffic for 15 s ends, so a frozen or disconnected device turns `unreachable` within that time.
 
 A unit is either local (`--compute-unit`) or bound to a peer. The daemon keeps one link per peer

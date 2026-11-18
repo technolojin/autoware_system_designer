@@ -1,7 +1,7 @@
-# Services every topology's compose file extends: the workspace build and the daemon of the compute
-# units of one execution environment. run.py supplies the source checkout and the site directory,
-# which holds the SSH keys and, from the bindings of the topology, the site file of the daemon with
-# ASD_MAIN.
+# Services of the multi-unit environment: the workspace build and the daemon of one execution
+# environment. run.py runs the build from this file and derives a project per E/E architecture
+# whose services extend "unit"; it supplies the source checkout and the site directory, which
+# holds the SSH keys.
 services:
   build:
     image: asd-multi-unit:${ASD_ROS_DISTRO:-humble}
@@ -20,7 +20,7 @@ services:
       - ${ASD_SOURCE_DIR:?source checkout, set by run.py}:/ws/src/autoware_system_designer:ro
       - ws:/ws/out
 
-  # Daemon of the compute units ASD_COMPUTE_UNITS on ASD_PORT.
+  # Daemon of the environment ASD_ENVIRONMENT of the E/E architecture ASD_EE_ARCHITECTURE.
   unit:
     image: asd-multi-unit:${ASD_ROS_DISTRO:-humble}
     build: *image
@@ -30,12 +30,13 @@ services:
     environment:
       ROS_DOMAIN_ID: ${ASD_ROS_DOMAIN_ID:-87}
       ASD_RMW_IMPLEMENTATION: ${ASD_RMW_IMPLEMENTATION:-}
+      ASD_SSHD_PORT: ${ASD_SSHD_PORT:-2222}
     volumes:
       - ${ASD_SOURCE_DIR:?source checkout, set by run.py}:/ws/src/autoware_system_designer:ro
       - ws:/ws/out
-      - ${ASD_SITE_DIR:?directory of the keys and the site file, made by run.py}:/run/asd/site:ro
-    healthcheck:
-      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:$${ASD_PORT}/api/health"]
-      interval: 2s
-      timeout: 3s
-      retries: 30
+      - ${ASD_SITE_DIR:?directory of the keys, made by run.py}:/run/asd/site:ro
+
+volumes:
+  # Built workspace, shared by every architecture and kept per ROS distribution.
+  ws:
+    name: asd-multi-unit-ws-${ASD_ROS_DISTRO:-humble}

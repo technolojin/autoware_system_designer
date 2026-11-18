@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""TypeAlpha on the daemons of its compute units, in every Docker topology of the system.
+"""TypeAlpha on the daemons of its compute units, on the Docker stand-in of every E/E architecture of the system.
 
-Tests run in file order on one environment per topology: the units are launched once, observed,
+Tests run in file order on one environment per architecture: the units are launched once, observed,
 cut off and brought back where they are on a device of their own, then shut down one by one. Every
-unit is driven through the main daemon, and what a test knows of a topology it reads from the
+unit is driven through the main daemon, and what a test knows of an architecture it reads from the
 environment: the units, the service and device of each, its address, and the main daemon's units.
 A fault is made on a device, and takes every unit of the device with it.
 """
@@ -48,7 +48,7 @@ REMATCHES_AFTER_FREEZE = os.environ.get("ASD_RMW_IMPLEMENTATION") == "rmw_cyclon
 def _remote_device(environment: Environment, unit: str) -> str:
     """The device of ``unit``; the test is skipped when it is the main daemon's."""
     if not environment.remote(unit):
-        pytest.skip(f"{unit} shares the device of the main daemon in topology {environment.topology}")
+        pytest.skip(f"{unit} shares the device of the main daemon in {environment.architecture}")
     return environment.device[unit]
 
 
@@ -78,8 +78,11 @@ def _assert_cut_off(environment: Environment, device: str) -> None:
     for unit in cut:
         assert environment.peer(unit)["state"] == "unreachable"
         with pytest.raises(RpcError) as refused:
-            environment.main.rpc("launch.status", compute_unit=unit)
+            environment.main.rpc("monitor.sample", compute_unit=unit, interval=1.0)
         assert refused.value.code == "unavailable"
+        # The sessions last reported stand in for the ones the peer no longer answers with.
+        sessions = environment.main.rpc("launch.status", compute_unit=unit)["sessions"]
+        assert sessions and all(session["stale"] for session in sessions)
     for other in environment.units:
         if other not in cut:
             assert environment.main.unit_status(other) == "running"

@@ -315,17 +315,20 @@
       {
         "description": "Primary unit hosting the talker.",
         "kind": "onboard",
-        "name": "main_ecu"
+        "name": "main_ecu",
+        "requires": []
       },
       {
         "description": "",
         "kind": "onboard",
-        "name": "sub_ecu"
+        "name": "sub_ecu",
+        "requires": []
       },
       {
         "description": "Remote operation station; no launcher of its own.",
         "kind": "offboard",
-        "name": "remote_ecu"
+        "name": "remote_ecu",
+        "requires": []
       }
     ],
     "mode": "solo",

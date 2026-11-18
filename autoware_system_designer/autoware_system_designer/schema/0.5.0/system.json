@@ -122,6 +122,15 @@
           },
           "description": {
             "type": "string"
+          },
+          "requires": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
+            "description": "Capabilities the unit's execution environment has to provide (e.g. gpu); checked against the environment an E/E architecture binds the unit to"
           }
         },
         "additionalProperties": false

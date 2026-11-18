@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TypedDict, Union
 
@@ -48,11 +48,15 @@ class ComputeUnit:
     An ``onboard`` unit runs on the deployed vehicle and gets a launcher. An
     ``offboard`` unit is a participant outside the vehicle (infrastructure,
     cloud, remote operation); its components are declared for wiring only.
+
+    ``requires`` names the capabilities (e.g. ``gpu``) the unit's execution
+    environment has to provide, whatever hardware that turns out to be.
     """
 
     name: str
     kind: str = "onboard"  # one of COMPUTE_UNIT_KINDS
     description: str = ""
+    requires: List[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, d: dict) -> "ComputeUnit":
@@ -60,6 +64,7 @@ class ComputeUnit:
             name=d["name"],
             kind=d.get("kind", "onboard"),
             description=d.get("description", ""),
+            requires=list(d.get("requires") or []),
         )
 
 
