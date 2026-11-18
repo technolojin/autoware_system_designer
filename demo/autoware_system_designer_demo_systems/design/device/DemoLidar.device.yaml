@@ -1,0 +1,15 @@
+autoware_system_design_format: 0.5.0
+
+name: DemoLidar.device
+
+description: Rotating LiDAR streaming its point cloud over Ethernet.
+
+role: sensor
+
+hardware: lidar
+
+interfaces:
+  - name: eth0
+    type: ethernet
+    bitrate: 1G
+    data_rate: 200M

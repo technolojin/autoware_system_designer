@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from autoware_system_designer.builder.config.config_registry import ConfigRegistry, format_duplicate_report
 from autoware_system_designer.builder.deployment_instance import DeploymentInstance
-from autoware_system_designer.builder.ee_architecture import resolve_ee_architecture
+from autoware_system_designer.builder.ee_architecture import peripheral_arguments, resolve_ee_architecture
 from autoware_system_designer.builder.export.instance_to_json import collect_system_structure
 from autoware_system_designer.builder.export.json_io import (
     extract_system_structure_data,
@@ -91,6 +91,8 @@ from autoware_system_designer.parser.subsystem_parser import (
 from autoware_system_designer.parser.yaml_parser import yaml_parser
 
 logger = logging.getLogger(__name__)
+
+EE_ARCHITECTURE_SUFFIX = ".ee_architecture"
 
 
 @dataclass
@@ -189,14 +191,17 @@ class DeploymentBuilder:
         self._undefined_variables: Dict[str, Dict[str, List[str]]] = {}
         # Values holding $(command ...), by source location, over every mode.
         self._command_uses: Dict[str, str] = {}
+        # Built system structure of each mode.
+        self._structures: Dict[str, Dict[str, Any]] = {}
 
     def build(self) -> BuildArtifacts:
         try:
             system_config, deploy_variants, _table_path = self._resolve_target(self.deploy_config)
+            self._declare_peripheral_arguments(system_config)
             artifacts = self._init_artifacts(system_config, deploy_variants)
             self._check_deploy_arguments(artifacts)
-            self._resolve_ee_architectures(system_config, artifacts)
             self._build_modes(system_config, artifacts)
+            self._resolve_ee_architectures(system_config, artifacts)
             self._check_used_duplicates()
             self._check_undefined_variables(artifacts)
             self._report_command_substitutions()
@@ -296,6 +301,27 @@ class DeploymentBuilder:
             config_registry=self.config_registry,
         )
 
+    @staticmethod
+    def _declare_peripheral_arguments(system_config: SystemConfig) -> None:
+        """Declare a system argument for each node parameter a peripheral takes from the E/E architecture."""
+        declared = {argument.get("name") for argument in system_config.arguments or [] if isinstance(argument, dict)}
+        added = []
+        for entry in peripheral_arguments(system_config.peripherals):
+            if entry["argument"] in declared:
+                raise ValidationError(
+                    f"System {system_config.full_name} declares argument '{entry['argument']}', which parameter "
+                    f"'{entry['parameter']}' of peripheral '{entry['peripheral']}' is bound by"
+                )
+            declared.add(entry["argument"])
+            added.append(
+                {
+                    "name": entry["argument"],
+                    "description": f"{entry['value']} of peripheral '{entry['peripheral']}', set by the E/E architecture",
+                }
+            )
+        if added:
+            system_config.arguments = [*(system_config.arguments or []), *added]
+
     def _resolve_ee_architectures(self, system_config: SystemConfig, artifacts: BuildArtifacts) -> None:
         names = deployment_ee_architectures(self.deploy_config.deployment_file)
         duplicates = sorted({name for name in names if names.count(name) > 1})
@@ -305,10 +331,53 @@ class DeploymentBuilder:
             )
         artifacts.ee_architectures = [
             resolve_ee_architecture(
-                self.config_registry.get_ee_architecture(name), system_config, self.config_registry.get_device
+                self.config_registry.get_ee_architecture(name),
+                system_config,
+                self.config_registry.get_device,
+                self._structures,
             )
             for name in names
         ]
+        self._bind_deploy_architectures(artifacts, names)
+
+    @staticmethod
+    def _bind_deploy_architectures(artifacts: BuildArtifacts, names: List[str]) -> None:
+        """Set the peripheral arguments of each deploy from the E/E architecture it names."""
+        records = {record["name"]: record for record in artifacts.ee_architectures}
+        bound = sorted(
+            {
+                p["argument"]
+                for record in records.values()
+                for peripheral in record["peripherals"]
+                for p in peripheral["parameters"]
+            }
+        )
+        for deploy_item in artifacts.deploy_variants:
+            name = deploy_item.get("ee_architecture")
+            if name is None:
+                if bound:
+                    logger.warning(
+                        f"Deployment '{deploy_item.get('name')}' names no E/E architecture; its launches bind "
+                        f"argument(s) {bound} by hand"
+                    )
+                continue
+            name = name.removesuffix(EE_ARCHITECTURE_SUFFIX)
+            if name not in records:
+                raise ValidationError(
+                    f"Deployment '{deploy_item.get('name')}' names E/E architecture '{name}', which the deployments "
+                    f"table does not list {names}"
+                )
+            deploy_item["ee_architecture"] = name
+            arguments = list(deploy_item.get("arguments") or [])
+            deploy_item["arguments"] = arguments
+            given = {argument.get("name") for argument in arguments if isinstance(argument, dict)}
+            for parameter in (p for peripheral in records[name]["peripherals"] for p in peripheral["parameters"]):
+                if parameter["argument"] in given:
+                    raise ValidationError(
+                        f"Deployment '{deploy_item.get('name')}' sets argument '{parameter['argument']}', which "
+                        f"E/E architecture '{name}' sets"
+                    )
+                arguments.append({"name": parameter["argument"], "value": parameter["resolved"]})
 
     def _export_workspace_root(self) -> Optional[str]:
         """Token base for exported paths; None when the export tree sits outside the workspace.
@@ -514,6 +583,7 @@ class DeploymentBuilder:
                     mode_name, mode_system_config, artifacts
                 )
                 structure_payload = self._export_mode_structure(mode_key, deploy_instance, artifacts)
+                self._structures[mode_key] = structure_payload["data"]
                 resolver = deploy_instance.parameter_resolver
                 for location, value in (resolver.command_uses if resolver else {}).items():
                     self._command_uses.setdefault(location, value)

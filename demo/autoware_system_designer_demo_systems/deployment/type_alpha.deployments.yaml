@@ -1,4 +1,4 @@
-autoware_system_design_format: 0.4.0
+autoware_system_design_format: 0.5.0
 
 base: TypeAlpha.system
 
@@ -10,9 +10,11 @@ ee_architectures:
   - TypeAlphaRemotePair.ee_architecture
   - TypeAlphaSharedEnvironment.ee_architecture
 
+# One deploy per hardware variant of vehicle_x; each takes its peripheral arguments from its E/E architecture.
 deploy_list:
   - name: vehicle_x
-    arguments:
+    ee_architecture: TypeAlphaBridge.ee_architecture
+    arguments: &vehicle_x
       - name: vehicle_id
         value: vehicle_x
       - name: individual_params_path
@@ -23,3 +25,18 @@ deploy_list:
         value: lanelet2_map.osm
       - name: pointcloud_map_file
         value: pointcloud_map.pcd
+  - name: vehicle_x_host
+    ee_architecture: TypeAlphaHost.ee_architecture
+    arguments: *vehicle_x
+  - name: vehicle_x_native_main
+    ee_architecture: TypeAlphaNativeMain.ee_architecture
+    arguments: *vehicle_x
+  - name: vehicle_x_local_pair
+    ee_architecture: TypeAlphaLocalPair.ee_architecture
+    arguments: *vehicle_x
+  - name: vehicle_x_remote_pair
+    ee_architecture: TypeAlphaRemotePair.ee_architecture
+    arguments: *vehicle_x
+  - name: vehicle_x_shared_environment
+    ee_architecture: TypeAlphaSharedEnvironment.ee_architecture
+    arguments: *vehicle_x

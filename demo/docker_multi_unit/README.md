@@ -96,7 +96,9 @@ ports and the bridge subnet.
 
 `up` runs the `build` service first: `colcon build` of the checkout (mounted read-only) into the
 volume `asd-multi-unit-ws-<distro>`, which every architecture shares, so a later `up` rebuilds only
-what changed, and reads the architectures from the new export. Launch a unit from the Launch activity of the workbench, or by request:
+what changed, and reads the architectures from the new export. Launch a unit from the Launch activity of the workbench, or by request,
+with the deploy variant built for the running architecture (`vehicle_x` is the one of `TypeAlphaBridge`; a daemon refuses
+the variant of another architecture):
 
 ```bash
 curl -s http://127.0.0.1:8781/api/rpc -H 'Content-Type: application/json' -H 'X-System-Designer-Client: shell' \
@@ -168,7 +170,7 @@ processes and leaves the others running, and the past runs of all three are list
 units of a device other than the main daemon's also stay reachable over a slow, lossy link, and are
 reported `unreachable` and then read anew when the device is paused, taken off the network, or
 killed and started again. The units, their services and devices are read from `run.py`; the
-system, its deploy and the topics listened to are the tests' own. `TypeAlphaNativeMain` is skipped
+system and the topics listened to are the tests' own; the deploy is the one built for the architecture. `TypeAlphaNativeMain` is skipped
 without `ASD_NATIVE_INSTALL`; with `ASD_HOST_DEVICE`, only the architecture `ASD_HOST_ARCHITECTURE`
 names is run. They are not part of
 `colcon test`.

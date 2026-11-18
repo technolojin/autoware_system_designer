@@ -2,19 +2,31 @@ autoware_system_design_format: 0.5.0
 
 name: TypeAlphaBridge.ee_architecture
 
-description: Three ECUs on one vehicle network, one compute unit on each.
+description: Three ECUs on one vehicle network, one compute unit on each; the LiDARs reach ecu_a through a sensor switch, the camera has a direct link and the vehicle controller is on the CAN bus of ecu_b.
 
 networks:
   - name: vehicle
     subnet: 172.30.87.0/24
+    carries: [daemon, dds]
+  - name: sensor
+    subnet: 172.30.88.0/24
+    carries: [ptp]
 
 devices:
   - name: ecu_a
     hardware: x86_64
     interfaces:
       - name: eth0
+        bitrate: 1G
         network: vehicle
         address: 172.30.87.11
+      - name: eth1
+        bitrate: 10G
+        network: sensor
+        address: 172.30.88.1
+      - name: gmsl0
+        type: gmsl
+        bitrate: 6G
     environments:
       - name: host
         daemon_port: 8781
@@ -22,8 +34,12 @@ devices:
     hardware: x86_64
     interfaces:
       - name: eth0
+        bitrate: 1G
         network: vehicle
         address: 172.30.87.12
+      - name: can0
+        type: can
+        bitrate: 500k
     environments:
       - name: host
         daemon_port: 8782
@@ -31,11 +47,74 @@ devices:
     hardware: x86_64
     interfaces:
       - name: eth0
+        bitrate: 1G
         network: vehicle
         address: 172.30.87.13
     environments:
       - name: host
         daemon_port: 8783
+  - name: vehicle_switch
+    device: DemoSwitch.device
+  - name: sensor_switch
+    device: DemoSwitch.device
+  - name: lidar_top
+    device: DemoLidar.device
+    interfaces:
+      - name: eth0
+        network: sensor
+        address: 172.30.88.201
+  - name: lidar_left
+    device: DemoLidar.device
+    interfaces:
+      - name: eth0
+        network: sensor
+        address: 172.30.88.202
+  - name: lidar_right
+    device: DemoLidar.device
+    interfaces:
+      - name: eth0
+        network: sensor
+        address: 172.30.88.203
+  - name: lidar_rear
+    device: DemoLidar.device
+    interfaces:
+      - name: eth0
+        network: sensor
+        address: 172.30.88.204
+  - name: camera_front
+    device: DemoCamera.device
+  - name: vcu
+    device: DemoVehicleController.device
+
+connections:
+  - name: ecu_a_vehicle
+    link: [ecu_a.eth0, vehicle_switch.p1]
+  - name: ecu_b_vehicle
+    link: [ecu_b.eth0, vehicle_switch.p2]
+  - name: ecu_c_vehicle
+    link: [ecu_c.eth0, vehicle_switch.p3]
+  - name: ecu_a_sensor
+    link: [ecu_a.eth1, sensor_switch.up]
+  - name: lidar_top
+    link: [lidar_top.eth0, sensor_switch.p1]
+  - name: lidar_left
+    link: [lidar_left.eth0, sensor_switch.p2]
+  - name: lidar_right
+    link: [lidar_right.eth0, sensor_switch.p3]
+  - name: lidar_rear
+    link: [lidar_rear.eth0, sensor_switch.p4]
+  - name: camera_front
+    link: [camera_front.gmsl0, ecu_a.gmsl0]
+  - name: vehicle_can
+    bus: [ecu_b.can0, vcu.can0]
+
+time_sync:
+  - name: sensor_ptp
+    profile: ptpv2
+    grandmaster: ecu_a.eth1
+    reference: ntp
+    members:
+      [lidar_top.eth0, lidar_left.eth0, lidar_right.eth0, lidar_rear.eth0]
 
 main_environment: ecu_a/host
 
@@ -46,3 +125,15 @@ bindings:
     environment: ecu_b/host
   - compute_unit: planning_control
     environment: ecu_c/host
+  - peripheral: lidar_top
+    device: lidar_top
+  - peripheral: lidar_left
+    device: lidar_left
+  - peripheral: lidar_right
+    device: lidar_right
+  - peripheral: lidar_rear
+    device: lidar_rear
+  - peripheral: camera_front
+    device: camera_front
+  - peripheral: vehicle_controller
+    device: vcu

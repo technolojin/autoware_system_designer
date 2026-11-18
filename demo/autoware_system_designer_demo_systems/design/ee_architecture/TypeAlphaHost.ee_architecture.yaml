@@ -2,11 +2,27 @@ autoware_system_design_format: 0.5.0
 
 name: TypeAlphaHost.ee_architecture
 
-description: One ECU running each compute unit in its own container, on the ECU's network and shared memory.
+description: One ECU running each compute unit in its own container, on the ECU's network and shared memory; the LiDARs reach it through a sensor switch, the camera has a direct link and the vehicle controller is on its CAN bus.
+
+networks:
+  - name: sensor
+    subnet: 172.30.88.0/24
+    carries: [ptp]
 
 devices:
   - name: ecu
     hardware: x86_64
+    interfaces:
+      - name: eth1
+        bitrate: 10G
+        network: sensor
+        address: 172.30.88.1
+      - name: gmsl0
+        type: gmsl
+        bitrate: 6G
+      - name: can0
+        type: can
+        bitrate: 500k
     environments:
       - name: sensing_perception
         kind: container
@@ -20,6 +36,60 @@ devices:
         kind: container
         shared_memory: true
         daemon_port: 8783
+  - name: sensor_switch
+    device: DemoSwitch.device
+  - name: lidar_top
+    device: DemoLidar.device
+    interfaces:
+      - name: eth0
+        network: sensor
+        address: 172.30.88.201
+  - name: lidar_left
+    device: DemoLidar.device
+    interfaces:
+      - name: eth0
+        network: sensor
+        address: 172.30.88.202
+  - name: lidar_right
+    device: DemoLidar.device
+    interfaces:
+      - name: eth0
+        network: sensor
+        address: 172.30.88.203
+  - name: lidar_rear
+    device: DemoLidar.device
+    interfaces:
+      - name: eth0
+        network: sensor
+        address: 172.30.88.204
+  - name: camera_front
+    device: DemoCamera.device
+  - name: vcu
+    device: DemoVehicleController.device
+
+connections:
+  - name: ecu_sensor
+    link: [ecu.eth1, sensor_switch.up]
+  - name: lidar_top
+    link: [lidar_top.eth0, sensor_switch.p1]
+  - name: lidar_left
+    link: [lidar_left.eth0, sensor_switch.p2]
+  - name: lidar_right
+    link: [lidar_right.eth0, sensor_switch.p3]
+  - name: lidar_rear
+    link: [lidar_rear.eth0, sensor_switch.p4]
+  - name: camera_front
+    link: [camera_front.gmsl0, ecu.gmsl0]
+  - name: vehicle_can
+    bus: [ecu.can0, vcu.can0]
+
+time_sync:
+  - name: sensor_ptp
+    profile: ptpv2
+    grandmaster: ecu.eth1
+    reference: ntp
+    members:
+      [lidar_top.eth0, lidar_left.eth0, lidar_right.eth0, lidar_rear.eth0]
 
 main_environment: ecu/sensing_perception
 
@@ -30,3 +100,15 @@ bindings:
     environment: ecu/map_localization
   - compute_unit: planning_control
     environment: ecu/planning_control
+  - peripheral: lidar_top
+    device: lidar_top
+  - peripheral: lidar_left
+    device: lidar_left
+  - peripheral: lidar_right
+    device: lidar_right
+  - peripheral: lidar_rear
+    device: lidar_rear
+  - peripheral: camera_front
+    device: camera_front
+  - peripheral: vehicle_controller
+    device: vcu

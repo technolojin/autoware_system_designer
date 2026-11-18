@@ -109,8 +109,14 @@ class Daemon:
             return None
         return sessions[0] if sessions else None
 
+    def deploy(self) -> str:
+        """Deploy variant built for the daemon's E/E architecture."""
+        architecture = (self.rpc("health").get("ee_architecture") or {}).get("name")
+        system = next(s for s in self.rpc("systems.list")["systems"] if s["id"] == SYSTEM)
+        return next((v["name"] for v in system["deploy_variants"] if v["ee_architecture"] == architecture), DEPLOY)
+
     def launch(self, unit: str) -> None:
-        self.rpc("launch.start", system=SYSTEM, compute_unit=unit, mode="default", deploy=DEPLOY)
+        self.rpc("launch.start", system=SYSTEM, compute_unit=unit, mode="default", deploy=self.deploy())
 
     def shutdown(self, unit: str) -> None:
         self.rpc("launch.shutdown", compute_unit=unit)

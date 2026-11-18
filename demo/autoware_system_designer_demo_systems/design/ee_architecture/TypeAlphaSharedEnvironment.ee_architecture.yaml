@@ -9,6 +9,8 @@ base: TypeAlphaBridge.ee_architecture
 remove:
   devices:
     - name: ecu_c
+  connections:
+    - name: ecu_c_vehicle
 
 override:
   bindings:

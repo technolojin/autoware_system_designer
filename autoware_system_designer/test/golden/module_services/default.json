@@ -86,6 +86,7 @@
                 "is_global": false,
                 "is_outward": true,
                 "is_remapped": false,
+                "message_size": null,
                 "msg_type": "std_msgs/msg/String",
                 "name": "status",
                 "namespace": [
@@ -127,6 +128,7 @@
                 "is_global": false,
                 "is_outward": true,
                 "is_remapped": false,
+                "message_size": null,
                 "msg_type": "std_srvs/srv/SetBool",
                 "name": "set_mode",
                 "namespace": [
@@ -168,6 +170,7 @@
                 "is_global": false,
                 "is_outward": true,
                 "is_remapped": false,
+                "message_size": null,
                 "msg_type": "std_srvs/srv/Trigger",
                 "name": "reset",
                 "namespace": [
@@ -409,6 +412,7 @@
               "is_global": false,
               "is_outward": false,
               "is_remapped": false,
+              "message_size": null,
               "msg_type": "std_msgs/msg/String",
               "name": "status",
               "namespace": [
@@ -497,6 +501,7 @@
               "is_global": false,
               "is_outward": false,
               "is_remapped": false,
+              "message_size": null,
               "msg_type": "std_srvs/srv/SetBool",
               "name": "set_mode",
               "namespace": [
@@ -583,6 +588,7 @@
               "is_global": false,
               "is_outward": false,
               "is_remapped": false,
+              "message_size": null,
               "msg_type": "std_srvs/srv/Trigger",
               "name": "reset",
               "namespace": [
@@ -671,6 +677,7 @@
               "is_global": false,
               "is_outward": false,
               "is_remapped": false,
+              "message_size": null,
               "msg_type": "std_msgs/msg/String",
               "name": "status",
               "namespace": [
@@ -709,6 +716,7 @@
               "is_global": false,
               "is_outward": true,
               "is_remapped": false,
+              "message_size": null,
               "msg_type": "std_msgs/msg/String",
               "name": "status",
               "namespace": [
@@ -754,6 +762,7 @@
               "is_global": false,
               "is_outward": false,
               "is_remapped": false,
+              "message_size": null,
               "msg_type": "std_srvs/srv/SetBool",
               "name": "set_mode",
               "namespace": [
@@ -792,6 +801,7 @@
               "is_global": false,
               "is_outward": true,
               "is_remapped": false,
+              "message_size": null,
               "msg_type": "std_srvs/srv/SetBool",
               "name": "set_mode",
               "namespace": [
@@ -837,6 +847,7 @@
               "is_global": false,
               "is_outward": false,
               "is_remapped": false,
+              "message_size": null,
               "msg_type": "std_srvs/srv/Trigger",
               "name": "reset",
               "namespace": [
@@ -875,6 +886,7 @@
               "is_global": false,
               "is_outward": true,
               "is_remapped": false,
+              "message_size": null,
               "msg_type": "std_srvs/srv/Trigger",
               "name": "reset",
               "namespace": [
@@ -918,6 +930,7 @@
             "is_global": false,
             "is_outward": true,
             "is_remapped": false,
+            "message_size": null,
             "msg_type": "std_msgs/msg/String",
             "name": "status",
             "namespace": [
@@ -954,6 +967,7 @@
             "is_global": false,
             "is_outward": true,
             "is_remapped": false,
+            "message_size": null,
             "msg_type": "std_srvs/srv/SetBool",
             "name": "set_mode",
             "namespace": [
@@ -990,6 +1004,7 @@
             "is_global": false,
             "is_outward": true,
             "is_remapped": false,
+            "message_size": null,
             "msg_type": "std_srvs/srv/Trigger",
             "name": "reset",
             "namespace": [
@@ -1219,6 +1234,7 @@
           "is_global": false,
           "is_outward": false,
           "is_remapped": false,
+          "message_size": null,
           "msg_type": "std_msgs/msg/String",
           "name": "status",
           "namespace": [
@@ -1301,6 +1317,7 @@
           "is_global": false,
           "is_outward": false,
           "is_remapped": false,
+          "message_size": null,
           "msg_type": "std_srvs/srv/SetBool",
           "name": "set_mode",
           "namespace": [
@@ -1381,6 +1398,7 @@
           "is_global": false,
           "is_outward": false,
           "is_remapped": false,
+          "message_size": null,
           "msg_type": "std_srvs/srv/Trigger",
           "name": "reset",
           "namespace": [

@@ -3,9 +3,7 @@
   "title": "Device Entity Schema 0.5.0",
   "description": "Schema for autoware_system_design_format device entities",
   "type": "object",
-  "required": [
-    "name"
-  ],
+  "required": ["name"],
   "additionalProperties": false,
   "properties": {
     "autoware_system_design_format": {
@@ -20,14 +18,7 @@
     },
     "role": {
       "type": "string",
-      "enum": [
-        "ecu",
-        "switch",
-        "router",
-        "sensor",
-        "actuator",
-        "other"
-      ],
+      "enum": ["ecu", "switch", "router", "sensor", "actuator", "other"],
       "description": "ecu: hosts compute units; switch, router: forwards between its interfaces; sensor, actuator: peripheral hardware"
     },
     "hardware": {
@@ -38,9 +29,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "additionalProperties": false,
         "properties": {
           "name": {
@@ -77,6 +66,19 @@
                 "pattern": "^[0-9]+(\\.[0-9]+)?[kMG]?$"
               }
             ]
+          },
+          "data_rate": {
+            "description": "Data the device sends on the interface in bit/s: an integer, or a number with suffix k, M or G (e.g. 300M)",
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9]+(\\.[0-9]+)?[kMG]?$"
+              }
+            ]
           }
         }
       }
@@ -85,9 +87,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "additionalProperties": false,
         "properties": {
           "name": {
@@ -99,19 +99,12 @@
           },
           "kind": {
             "type": "string",
-            "enum": [
-              "host",
-              "container",
-              "vm"
-            ],
+            "enum": ["host", "container", "vm"],
             "description": "host: the device's operating system; container, vm: an isolated environment on it"
           },
           "network": {
             "type": "string",
-            "enum": [
-              "host",
-              "own"
-            ],
+            "enum": ["host", "own"],
             "description": "host (default): shares the device's network namespace, loopback included; own: has its own network namespace and address"
           },
           "shared_memory": {
@@ -135,10 +128,7 @@
       "description": "Devices inside this one (SoCs of a board, an on-board switch)",
       "items": {
         "type": "object",
-        "required": [
-          "name",
-          "device"
-        ],
+        "required": ["name", "device"],
         "additionalProperties": false,
         "properties": {
           "name": {
@@ -206,14 +196,10 @@
         },
         "oneOf": [
           {
-            "required": [
-              "link"
-            ]
+            "required": ["link"]
           },
           {
-            "required": [
-              "bus"
-            ]
+            "required": ["bus"]
           }
         ]
       }

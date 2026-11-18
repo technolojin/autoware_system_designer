@@ -1,8 +1,9 @@
 // E/E activity: the wiring of an E/E architecture the system is declared for.
-// The side panel picks the architecture and what the diagram lights (the
-// connections, a time sync domain or a peripheral's hosts) and lists the
-// environments with their compute units; the inspector shows the selected
-// device or connection.
+// The side panel picks the architecture, the mode whose flows are analysed and
+// what the main view shows: the connections with their load, the compute
+// units with one line per flow into and out of them, a time sync domain or a
+// peripheral's hosts; it lists the environments with their compute units. The
+// inspector shows the selected device, connection, unit or line.
 (function () {
   const SD = window.SD;
   const { element, field, section, boundSelect, segmented, list } = SD.widgets;
@@ -10,6 +11,7 @@
 
   const VIEWS = [
     ["connections", "Connections"],
+    ["units", "Units"],
     ["sync", "Time sync"],
     ["peripherals", "Peripherals"],
   ];
@@ -17,7 +19,10 @@
 
   function row(label, value) {
     const line = element("div", "info-row");
-    line.append(element("span", "info-label", label), element("span", "info-value", value));
+    line.append(
+      element("span", "info-label", label),
+      element("span", "info-value", value),
+    );
     return line;
   }
 
@@ -28,11 +33,125 @@
     return box;
   }
 
-  const endpointLabel = (e) => (e.interface ? `${e.device}.${e.interface}` : e.device);
+  const endpointLabel = (e) =>
+    e.interface ? `${e.device}.${e.interface}` : e.device;
   const capacityLabel = (bitrate) => {
     const short = wiring.formatBitrate(bitrate);
     return short ? `${short}bit/s` : "not given";
   };
+  const percent = (value) =>
+    typeof value === "number" ? `${Math.round(value * 100)} %` : "–";
+  const bytesLabel = (size) => {
+    const short = wiring.formatBitrate(size);
+    return short ? `${short}B` : "–";
+  };
+  const endLabel = (end) =>
+    end.kind === "peripheral" ? `${end.name} (peripheral)` : end.name;
+
+  // Rate of a flow with the count of its topics whose rate is unknown.
+  function flowRate(flow) {
+    const known = flow.bitrate ? capacityLabel(flow.bitrate) : "";
+    const unrated = flow.unrated ? `${flow.unrated} without a rate` : "";
+    return [known, unrated].filter(Boolean).join(" · ") || "–";
+  }
+
+  function flowCard(model, flow) {
+    const rows = [
+      row("Rate", flowRate(flow)),
+      flow.node && row("Node", flow.node),
+      flow.kind === "topics" &&
+        row("Way", flow.local ? "inside one device" : "over the wiring"),
+      ...flow.routes.map((route, index) =>
+        row(
+          index ? "" : "Via",
+          route.map((id) => connectionName(model, id)).join(" → ") || "–",
+        ),
+      ),
+    ];
+    const box = card(
+      `${endLabel(flow.source)} → ${endLabel(flow.target)}`,
+      ...rows,
+    );
+    flow.topics.forEach((topic) => {
+      const group = element("div", "info-group");
+      group.appendChild(element("div", "info-subtitle", topic.topic));
+      if (topic.msgType) group.appendChild(row("Type", topic.msgType));
+      group.appendChild(
+        row(
+          "Rate",
+          [
+            topic.frequency ? `${topic.frequency} Hz` : "no rate",
+            topic.messageSize ? bytesLabel(topic.messageSize) : "no size",
+            topic.bitrate ? `${wiring.formatBitrate(topic.bitrate)}bit/s` : "",
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        ),
+      );
+      box.appendChild(group);
+    });
+    return box;
+  }
+
+  function connectionName(model, id) {
+    const connection = model.connections.find((c) => c.id === id);
+    return connection?.name || id;
+  }
+
+  function unitCards(model, mode, unit) {
+    const environment = [...model.environments.values()].find((e) =>
+      (e.compute_units || []).includes(unit),
+    );
+    const flows = wiring.unitFlows(model.analysis.get(mode)?.flows || [], unit);
+    const listed = (title, items, end) =>
+      card(
+        title,
+        ...(items.length
+          ? items.map((flow) => {
+              const group = element("div", "info-group");
+              group.append(
+                element("div", "info-subtitle", endLabel(flow[end])),
+                row("Rate", flowRate(flow)),
+              );
+              return group;
+            })
+          : [element("p", "panel-empty", "None.")]),
+      );
+    return [
+      card(
+        unit,
+        environment && row("Environment", environment.id),
+        environment && row("Device", environment.device),
+        environment?.provides?.length &&
+          row("Provides", environment.provides.join(", ")),
+      ),
+      listed("In", flows.inputs, "source"),
+      listed("Out", flows.outputs, "target"),
+    ];
+  }
+
+  function lineCards(model, mode, id) {
+    const line = wiring
+      .unitLines(model.analysis.get(mode)?.flows || [])
+      .find((l) => l.id === id);
+    if (!line) return [];
+    const cards = [line.forward, line.backward]
+      .filter(Boolean)
+      .map((flow) => flowCard(model, flow));
+    if (line.kind === "peripheral") {
+      const peripheral = model.peripherals.find((p) => p.name === line.ends[0]);
+      if (peripheral?.parameters.length)
+        cards.push(
+          card(
+            "Parameters",
+            ...peripheral.parameters.map((p) =>
+              row(p.name, `${p.resolved ?? "–"} (${p.value})`),
+            ),
+          ),
+        );
+    }
+    return cards;
+  }
 
   function deviceCards(model, device) {
     const cards = [];
@@ -64,7 +183,9 @@
         );
         model.connections
           .filter((c) =>
-            c.endpoints.some((e) => e.device === device.id && e.interface === iface.name),
+            c.endpoints.some(
+              (e) => e.device === device.id && e.interface === iface.name,
+            ),
           )
           .forEach((c) =>
             group.appendChild(
@@ -90,7 +211,11 @@
         const environment = model.environments.get(id) || {};
         const group = element("div", "info-group");
         group.appendChild(
-          element("div", "info-subtitle", id === model.mainEnvironment ? `${id} (main)` : id),
+          element(
+            "div",
+            "info-subtitle",
+            id === model.mainEnvironment ? `${id} (main)` : id,
+          ),
         );
         group.append(
           row("Units", (environment.compute_units || []).join(", ") || "none"),
@@ -113,12 +238,25 @@
       bound.forEach((p) => {
         const group = element("div", "info-group");
         group.appendChild(element("div", "info-subtitle", p.name));
-        if (p.component) group.appendChild(row("Component", p.component));
+        if (p.node) group.appendChild(row("Node", p.node));
+        else if (p.component) group.appendChild(row("Component", p.component));
+        p.parameters.forEach((parameter) =>
+          group.appendChild(
+            row(
+              parameter.name,
+              `${parameter.resolved ?? "–"} (${parameter.value})`,
+            ),
+          ),
+        );
         p.hosts.forEach((host) =>
           group.appendChild(
             row(
               host.compute_unit || "host",
-              [host.device && endpointLabel(host), host.address, host.path ? "" : "no path"]
+              [
+                host.device && endpointLabel(host),
+                host.address,
+                host.path ? "" : "no path",
+              ]
                 .filter(Boolean)
                 .join(" · "),
             ),
@@ -132,21 +270,38 @@
     const roles = [];
     model.timeSync.forEach((domain) => {
       if (domain.grandmaster?.device === device.id)
-        roles.push(row(domain.name, `grandmaster · ${domain.grandmaster.interface || ""}`));
+        roles.push(
+          row(
+            domain.name,
+            `grandmaster · ${domain.grandmaster.interface || ""}`,
+          ),
+        );
       domain.members
         .filter((m) => m.device === device.id)
         .forEach((m) =>
-          roles.push(row(domain.name, `slave · ${m.interface || ""}${m.path ? "" : " · no path"}`)),
+          roles.push(
+            row(
+              domain.name,
+              `slave · ${m.interface || ""}${m.path ? "" : " · no path"}`,
+            ),
+          ),
         );
     });
     if (roles.length) cards.push(card("Time sync", ...roles));
     return cards;
   }
 
-  function connectionCards(model, connection) {
+  function connectionCards(model, mode, connection) {
     const domains = model.timeSync
-      .filter((d) => d.members.some((m) => (m.path || []).includes(connection.id)))
+      .filter((d) =>
+        d.members.some((m) => (m.path || []).includes(connection.id)),
+      )
       .map((d) => d.name);
+    const analysis = model.analysis.get(mode);
+    const load = analysis?.loads.get(connection.id);
+    const carried = (load?.flows || [])
+      .map((id) => analysis.flows.find((f) => f.id === id))
+      .filter(Boolean);
     return [
       card(
         connection.name || connection.id,
@@ -158,9 +313,29 @@
       ),
       card(
         "Endpoints",
-        ...connection.endpoints.map((e) => row(e.device, e.interface || "any port")),
+        ...connection.endpoints.map((e) =>
+          row(e.device, e.interface || "any port"),
+        ),
       ),
-    ];
+      load &&
+        card(
+          `Load in ${mode}`,
+          row("Busiest direction", capacityLabel(load.load)),
+          row("Utilization", percent(load.utilization)),
+          ...carried.map((flow) => {
+            const group = element("div", "info-group");
+            group.append(
+              element(
+                "div",
+                "info-subtitle",
+                `${endLabel(flow.source)} → ${endLabel(flow.target)}`,
+              ),
+              row("Rate", flowRate(flow)),
+            );
+            return group;
+          }),
+        ),
+    ].filter(Boolean);
   }
 
   SD.workbench.registerActivity({
@@ -171,31 +346,44 @@
     daemon: false,
     inspector: true,
     icon: "M3 3h5v4H3zM12 3h5v4h-5zM7.5 13h5v4h-5zM5.5 7v3h9V7M10 10v3",
-    status: (store) => (store.get("architecture") ? [store.get("architecture")] : []),
+    status: (store) =>
+      store.get("architecture") ? [store.get("architecture")] : [],
     mount({ side, main, inspector }, { config, store }) {
       const records = config.eeArchitectures || [];
       const names = records.map((record) => record.name);
       store.define("architecture", names[0] || "", (v) => names.includes(v));
-      store.define("wiring", VIEWS[0][0], (v) => VIEWS.some(([id]) => id === v));
+      store.define("wiring", VIEWS[0][0], (v) =>
+        VIEWS.some(([id]) => id === v),
+      );
       store.define("domain", "");
       store.define("peripheral", "");
       store.syncUrl();
 
       const frame = SD.widgets.mainView({
-        empty: names.length ? "" : "No E/E architecture is declared for this system.",
+        empty: names.length
+          ? ""
+          : "No E/E architecture is declared for this system.",
       });
       main.appendChild(frame.element);
-      const empty = element("p", "panel-empty", "Select a device or a connection.");
+      const empty = element(
+        "p",
+        "panel-empty",
+        "Select a device or a connection.",
+      );
       const details = element("div", "info-panel");
       details.hidden = true;
       inspector.append(empty, details);
 
       let model = null;
+      let selected = null;
       const diagram = wiring.diagram(frame.body, { onSelect: select });
+      const unitsDiagram = wiring.unitDiagram(frame.body, { onSelect: select });
+      const shown = () =>
+        store.get("wiring") === "units" ? unitsDiagram : diagram;
       [
-        ["−", "Zoom out", () => diagram.zoomBy(1 / ZOOM_STEP)],
-        ["+", "Zoom in", () => diagram.zoomBy(ZOOM_STEP)],
-        ["Fit", "Fit the width", () => diagram.fit()],
+        ["−", "Zoom out", () => shown().zoomBy(1 / ZOOM_STEP)],
+        ["+", "Zoom in", () => shown().zoomBy(ZOOM_STEP)],
+        ["Fit", "Fit the width", () => shown().fit()],
       ].forEach(([label, title, run]) => {
         const button = element("button", "panel-button", label);
         button.type = "button";
@@ -205,15 +393,23 @@
       });
 
       function select(target) {
+        selected = target;
         diagram.select(target);
-        const device = target?.type === "device" ? model.byId.get(target.id) : null;
+        unitsDiagram.select(target);
+        const mode = store.get("mode");
+        const device =
+          target?.type === "device" ? model.byId.get(target.id) : null;
         const connection =
-          target?.type === "connection" ? model.connections.find((c) => c.id === target.id) : null;
-        const cards = device
-          ? deviceCards(model, device)
-          : connection
-            ? connectionCards(model, connection)
-            : [];
+          target?.type === "connection"
+            ? model.connections.find((c) => c.id === target.id)
+            : null;
+        let cards = [];
+        if (device) cards = deviceCards(model, device);
+        else if (connection) cards = connectionCards(model, mode, connection);
+        else if (target?.type === "unit")
+          cards = unitCards(model, mode, target.id);
+        else if (target?.type === "line")
+          cards = lineCards(model, mode, target.id);
         details.replaceChildren(...cards);
         details.hidden = !cards.length;
         empty.hidden = !!cards.length;
@@ -225,7 +421,20 @@
       capacity.checked = true;
       const capacityCheck = element("label", "panel-check");
       capacityCheck.append(capacity, "Capacity of each connection");
-      capacity.addEventListener("change", () => diagram.setView({ capacity: capacity.checked }));
+      capacity.addEventListener("change", () =>
+        diagram.setView({ capacity: capacity.checked }),
+      );
+      const loadToggle = document.createElement("input");
+      loadToggle.type = "checkbox";
+      loadToggle.checked = true;
+      const loadCheck = element("label", "panel-check");
+      loadCheck.append(loadToggle, "Load of the mode's flows");
+      loadToggle.addEventListener("change", showView);
+      const legend = element(
+        "p",
+        "panel-note",
+        "Rates in bit/s of the mode's flows: ↓ from the upper unit, ↑ from the lower; +n? counts topics without a known rate. A dashed line stays inside one device.",
+      );
       const note = element("p", "panel-note");
       const choices = element("div", "panel-group");
       const environments = element("div", "panel-group");
@@ -239,6 +448,8 @@
         ),
         views.element,
         capacityCheck,
+        loadCheck,
+        legend,
         note,
         choices,
         environments,
@@ -259,11 +470,13 @@
         } else if (view === "peripherals") {
           items = model.peripherals.map((p) => [
             p.name,
-            p.device && p.device !== p.name ? `${p.name} → ${p.device}` : p.name,
+            p.device && p.device !== p.name
+              ? `${p.name} → ${p.device}`
+              : p.name,
           ]);
         }
         choices.replaceChildren();
-        if (view === "connections") return;
+        if (view === "connections" || view === "units") return;
         if (!items.length) {
           choices.appendChild(
             element(
@@ -276,10 +489,15 @@
           );
           return;
         }
-        if (!items.some(([value]) => value === store.get(key))) store.set(key, "");
-        const picker = list([["", "All"], ...items], (value) => store.set(key, value));
+        if (!items.some(([value]) => value === store.get(key)))
+          store.set(key, "");
+        const picker = list([["", "All"], ...items], (value) =>
+          store.set(key, value),
+        );
         picker.mark(store.get(key));
-        choices.appendChild(section(view === "sync" ? "Domains" : "Peripherals", picker.element));
+        choices.appendChild(
+          section(view === "sync" ? "Domains" : "Peripherals", picker.element),
+        );
       }
 
       function showEnvironments() {
@@ -289,22 +507,42 @@
           `${e.id}: ${(e.compute_units || []).join(", ") || "no unit"}`,
         ]);
         if (!items.length) return;
-        const picker = list(items, (device) => select({ type: "device", id: device }));
+        const picker = list(items, (device) =>
+          select({ type: "device", id: device }),
+        );
         environments.appendChild(section("Environments", picker.element));
       }
 
       function showView() {
-        views.mark(store.get("wiring"));
+        const view = store.get("wiring");
+        const analysis = model.analysis.get(store.get("mode"));
+        views.mark(view);
         showChoices();
+        diagram.element.hidden = view === "units";
+        unitsDiagram.element.hidden = view !== "units";
+        capacityCheck.hidden = view === "units";
+        legend.hidden = view !== "units";
+        loadCheck.hidden = view === "units" || !analysis;
         diagram.setView({
-          mode: store.get("wiring"),
+          mode: view,
           domain: store.get("domain"),
           peripheral: store.get("peripheral"),
+          loads: loadToggle.checked && analysis ? analysis.loads : null,
         });
+        if (view === "units") unitsDiagram.show(model, store.get("mode"));
+        // Units and lines are drawn in the units view only, connections outside it.
+        const onUnits = selected?.type === "unit" || selected?.type === "line";
+        const kept =
+          !selected ||
+          selected.type === "device" ||
+          onUnits === (view === "units");
+        select(kept ? selected : null);
       }
 
       function load() {
-        const record = records.find((r) => r.name === store.get("architecture"));
+        const record = records.find(
+          (r) => r.name === store.get("architecture"),
+        );
         if (!record) return;
         model = wiring.model(record);
         frame.setTitle(model.description || model.name);
@@ -319,7 +557,9 @@
       }
 
       store.onChange("architecture", load);
-      ["wiring", "domain", "peripheral"].forEach((key) => store.onChange(key, showView));
+      ["wiring", "domain", "peripheral", "mode"].forEach((key) =>
+        store.onChange(key, showView),
+      );
       load();
     },
   });

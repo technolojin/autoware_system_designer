@@ -1,0 +1,15 @@
+autoware_system_design_format: 0.5.0
+
+name: DemoVehicleController.device
+
+description: Drive-by-wire controller taking control commands and reporting the vehicle state on CAN.
+
+role: actuator
+
+hardware: vcu
+
+interfaces:
+  - name: can0
+    type: can
+    bitrate: 500k
+    data_rate: 200k

@@ -75,6 +75,8 @@ NATIVE_LOG = STATE_DIR / "native.log"
 NATIVE_SSH_CONFIG = STATE_DIR / "native_ssh_config"
 NATIVE_KNOWN_HOSTS = STATE_DIR / "native_known_hosts"
 HOST_DEVICE = os.environ.get("ASD_HOST_DEVICE")
+# Traffic of a network the stand-in containers are attached to; sensor networks stay out.
+UNIT_TRAFFIC = {"daemon", "dds"}
 HOST_WORKSPACE = (
     Path(os.environ["ASD_HOST_WORKSPACE"]).expanduser().resolve() if os.environ.get("ASD_HOST_WORKSPACE") else None
 )
@@ -203,7 +205,8 @@ class Architecture:
         devices = [device["name"] for device in self.record["devices"]]
         if HOST_DEVICE is not None and HOST_DEVICE not in devices:
             raise ArchitectureError(f"E/E architecture '{name}' has no device '{HOST_DEVICE}' (found: {devices})")
-        self.host_device: Optional[str] = HOST_DEVICE or (devices[0] if len(devices) == 1 else None)
+        hosting = [device["name"] for device in self.record["devices"] if device.get("environments")]
+        self.host_device: Optional[str] = HOST_DEVICE or (hosting[0] if len(hosting) == 1 else None)
         self.environments = [env for env in self.record["environments"] if env["compute_units"]]
         main = self.record["main_environment"] or self.environments[0]["id"]
         # Units on other devices than this machine: DDS and the forwards to them cross the bridge network.
@@ -305,11 +308,17 @@ class Architecture:
         attached = {
             interface["network"]: {"ipv4_address": interface["address"]}
             for interface in device.get("interfaces") or []
-            if interface.get("address")
+            if interface.get("address") and interface["network"] in self._unit_networks()
         }
         if not attached:
             raise ArchitectureError(f"device '{env['device']}' has no interface with an address")
         return attached
+
+    def _unit_networks(self) -> set:
+        """Networks the units talk over: those carrying daemon or DDS traffic, every one when none says."""
+        networks = self.record["networks"]
+        carrying = {n["name"] for n in networks if set(n.get("carries") or []) & UNIT_TRAFFIC}
+        return carrying or {n["name"] for n in networks}
 
     def _host_addresses(self) -> Dict[str, str]:
         """Address of this machine on each network, when one of the devices is this machine."""

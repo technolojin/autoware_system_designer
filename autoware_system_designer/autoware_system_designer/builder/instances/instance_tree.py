@@ -3,10 +3,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from autoware_system_designer.builder.config.launch_manager import LaunchManager
+from autoware_system_designer.builder.ee_architecture import peripheral_arguments
 from autoware_system_designer.builder.instances.node_groups import apply_node_groups
 from autoware_system_designer.builder.parameters.parameter_set_applier import apply_parameter_set
 from autoware_system_designer.common.exceptions import ValidationError, error_context
-from autoware_system_designer.common.source_location import SourceLocation
+from autoware_system_designer.common.source_location import SourceLocation, format_source, source_from_config
 from autoware_system_designer.model.namespace import Namespace
 from autoware_system_designer.model.parameters import ParameterType
 from autoware_system_designer.parser.data_validator import entity_name_decode
@@ -126,8 +127,36 @@ def set_system_instances(instance: "Instance", config_registry: "ConfigRegistry"
         child_instance = instance.children[instance_name]
         apply_parameter_set(instance, child_instance, cfg_component, config_registry)
 
-    # Third pass: set node groups.
+    # Third pass: node parameters an E/E architecture gives, bound at launch by their system arguments.
+    apply_peripheral_parameters(instance, config_registry)
+
+    # Fourth pass: set node groups.
     apply_node_groups(instance)
+
+
+def apply_peripheral_parameters(instance: "Instance", config_registry: "ConfigRegistry") -> None:
+    """Set each node parameter a peripheral takes from the E/E architecture to its system argument."""
+    peripherals = getattr(instance.configuration, "peripherals", None)
+    for entry in peripheral_arguments(peripherals):
+        node = entry["node"]
+        source = source_from_config(instance.configuration, "/peripherals")
+        if node is None:
+            raise ValidationError(
+                f"Peripheral '{entry['peripheral']}' gives parameter '{entry['parameter']}' and names no node",
+                source=source,
+            )
+        if not instance.parameter_manager.find_matching_nodes(node):
+            logger.info(f"Peripheral '{entry['peripheral']}': node '{node}' is not in this mode")
+            continue
+        instance.parameter_manager.apply_node_parameters(
+            node,
+            [],
+            [{"name": entry["parameter"], "type": "string", "value": f"$(var {entry['argument']})"}],
+            config_registry,
+            direct_parameter_type=ParameterType.MODE,
+            source=source,
+            parameter_sources=[source],
+        )
 
 
 def set_module_instances(

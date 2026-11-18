@@ -223,3 +223,52 @@
   stroke: var(--border-active);
   stroke-width: 3.5;
 }
+
+/* Load of a mode's flows on the connections */
+.wiring-capacity.loaded {
+  fill: var(--text-secondary);
+}
+
+.wiring-wire[data-load="busy"] {
+  stroke: var(--wiring-can);
+  stroke-width: 2.5;
+}
+
+.wiring-wire[data-load="over"] {
+  stroke: var(--wiring-lit-3);
+  stroke-width: 3;
+}
+
+/* Units view: compute units in their devices and one line per flow */
+.unit-box {
+  fill: var(--bg-primary);
+}
+
+.unit-line {
+  fill: none;
+  stroke: var(--wiring-lit-0);
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+.unit-line.kind-peripheral {
+  stroke: var(--wiring-lit-2);
+}
+
+.unit-line.local {
+  stroke-dasharray: 6 4;
+}
+
+.unit-hit {
+  fill: none;
+}
+
+.unit-line.selected {
+  stroke: var(--border-active);
+  stroke-width: 6;
+  opacity: 1;
+}
+
+.unit-rate {
+  font-size: 10px;
+}

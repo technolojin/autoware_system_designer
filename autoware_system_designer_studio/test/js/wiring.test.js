@@ -21,9 +21,12 @@ global.document = { createElementNS: () => ({}) };
 require(path.join(DIAGRAMS, "wiring_model.js"));
 require(path.join(DIAGRAMS, "wiring_layout.js"));
 require(path.join(DIAGRAMS, "wiring_diagram.js"));
+require(path.join(DIAGRAMS, "unit_diagram.js"));
 const wiring = global.window.SD.wiring;
 
-const RECORD = require(path.join(__dirname, "..", "data", "multi_ecu_ee_architecture.json"));
+const RECORD = require(
+  path.join(__dirname, "..", "data", "multi_ecu_ee_architecture.json"),
+);
 
 // Record of the format without wiring: devices carry their networks.
 const DECLARED = {
@@ -33,14 +36,17 @@ const DECLARED = {
   devices: ["ecu_a", "ecu_b", "ecu_c"].map((name, i) => ({
     name,
     hardware: "x86_64",
-    interfaces: [{ name: "eth0", network: "vehicle", address: `172.30.87.1${i + 1}` }],
+    interfaces: [
+      { name: "eth0", network: "vehicle", address: `172.30.87.1${i + 1}` },
+    ],
     environments: [{ name: "host", daemon_port: 8781 + i }],
   })),
   environments: [],
 };
 
 const box = (layout, id) => layout.devices.find((d) => d.id === id);
-const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const overlaps = (a, b) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 test("bit rates shorten to a capacity label", () => {
   assert.equal(wiring.formatBitrate(10e9), "10G");
@@ -58,7 +64,9 @@ test("the model resolves parts to the device they lie in", () => {
     model.parts.get("main").map((p) => p.id),
     ["main.switch"],
   );
-  assert.deepEqual(wiring.deviceEnvironments(model, model.byId.get("main")), ["main/host"]);
+  assert.deepEqual(wiring.deviceEnvironments(model, model.byId.get("main")), [
+    "main/host",
+  ]);
 });
 
 test("a record without wiring joins its devices by their networks", () => {
@@ -87,8 +95,8 @@ test("an empty record lays out to nothing", () => {
 test("hosting devices form the core row, shared switches rails, the rest hangs or sits above", () => {
   const layout = wiring.layout(wiring.model(RECORD));
   const rows = Object.fromEntries(layout.devices.map((d) => [d.id, d.row]));
-  ["main", "sub", "perception1", "perception2", "addon", "logging"].forEach((id) =>
-    assert.equal(rows[id], "core", id),
+  ["main", "sub", "perception1", "perception2", "addon", "logging"].forEach(
+    (id) => assert.equal(rows[id], "core", id),
   );
   assert.deepEqual(
     layout.rails.map((rail) => rail.id),
@@ -100,7 +108,10 @@ test("hosting devices form the core row, shared switches rails, the rest hangs o
   assert.equal(rows.radar_front_center, "below");
   assert.equal(box(layout, "gnss").y < layout.rails[0].y, true);
   assert.equal(layout.rails[1].y < box(layout, "main").y, true);
-  assert.equal(box(layout, "radar_front_center").y > box(layout, "radar_gateway").y, true);
+  assert.equal(
+    box(layout, "radar_front_center").y > box(layout, "radar_gateway").y,
+    true,
+  );
   assert.deepEqual(
     layout.parts.map((p) => [p.id, p.parent, p.bar]),
     [
@@ -131,10 +142,15 @@ test("every connection between devices is a wire of axis-aligned runs ending on 
   const model = wiring.model(RECORD);
   const layout = wiring.layout(model);
   const external = model.connections.filter((c) => !c.internal);
-  assert.deepEqual(layout.wires.map((w) => w.id).sort(), external.map((c) => c.id).sort());
+  assert.deepEqual(
+    layout.wires.map((w) => w.id).sort(),
+    external.map((c) => c.id).sort(),
+  );
   layout.wires.forEach((wire) => {
     assert.equal(wire.segments.length > 0, true, wire.id);
-    wire.segments.forEach((s) => assert.equal(s.x1 === s.x2 || s.y1 === s.y2, true, wire.id));
+    wire.segments.forEach((s) =>
+      assert.equal(s.x1 === s.x2 || s.y1 === s.y2, true, wire.id),
+    );
     assert.equal(wire.ends.length, wire.connection.endpoints.length, wire.id);
   });
   // A device hung by a link sits straight under its port.
@@ -142,7 +158,12 @@ test("every connection between devices is a wire of axis-aligned runs ending on 
   assert.equal(hung.segments.length, 1);
   assert.equal(hung.segments[0].x1, hung.segments[0].x2);
   // The wiring inside a composite device is drawn in its box.
-  assert.deepEqual(layout.innerStubs.map((s) => s.connection).sort(), ["c0", "c1", "c2", "c3"]);
+  assert.deepEqual(layout.innerStubs.map((s) => s.connection).sort(), [
+    "c0",
+    "c1",
+    "c2",
+    "c3",
+  ]);
 });
 
 test("each wire keeps a capacity label, filled where the bit rate is known", () => {
@@ -185,16 +206,28 @@ test("a time sync domain lights its paths and points at its members", () => {
   assert.notEqual(all.lit.get("c10"), all.lit.get("c19"));
 
   const one = wiring.syncOverlay(model, layout, "sensors_sub");
-  assert.deepEqual([...one.lit.keys()].sort(), ["c23", "c24", "c25", "c26", "c3"]);
+  assert.deepEqual([...one.lit.keys()].sort(), [
+    "c23",
+    "c24",
+    "c25",
+    "c26",
+    "c3",
+  ]);
   assert.equal(one.arrows.length, 4);
   const lidar = box(layout, "lidar_front_upper");
   assert.equal(
-    one.arrows.some((a) => a.device === "lidar_front_upper" && a.y === lidar.y && a.dir === "down"),
+    one.arrows.some(
+      (a) =>
+        a.device === "lidar_front_upper" && a.y === lidar.y && a.dir === "down",
+    ),
     true,
   );
   // A member behind a hung switch is entered from its side.
   const main = wiring.syncOverlay(model, layout, "sensors_main");
-  assert.equal(main.arrows.find((a) => a.device === "radar_front_center").dir, "right");
+  assert.equal(
+    main.arrows.find((a) => a.device === "radar_front_center").dir,
+    "right",
+  );
 });
 
 test("a peripheral lights the paths to its hosts and marks both ends", () => {
@@ -204,4 +237,133 @@ test("a peripheral lights the paths to its hosts and marks both ends", () => {
   assert.deepEqual([...one.devices].sort(), ["lidar_rear_upper", "main"]);
   const all = wiring.peripheralOverlay(model, "");
   assert.equal(all.devices.size > 2, true);
+});
+
+// Record of two ECUs with the analysis of one mode: a LiDAR feeding the main unit and
+// topics both ways between the units, one of them without a rate.
+const ANALYSED = {
+  ...DECLARED,
+  environments: [
+    { id: "ecu_a/host", device: "ecu_a", compute_units: ["main"] },
+    { id: "ecu_b/host", device: "ecu_b", compute_units: ["sub"] },
+  ],
+  peripherals: [
+    {
+      name: "lidar",
+      device: "lidar",
+      node: "/sensing/lidar",
+      hosts: [],
+      parameters: [],
+    },
+  ],
+  analysis: {
+    default: {
+      flows: [
+        {
+          id: "f0",
+          kind: "peripheral",
+          source: { kind: "peripheral", name: "lidar" },
+          target: { kind: "compute_unit", name: "main" },
+          bitrate: 2e8,
+          unrated: 0,
+          routes: [["c0"]],
+        },
+        {
+          id: "f1",
+          kind: "topics",
+          source: { kind: "compute_unit", name: "main" },
+          target: { kind: "compute_unit", name: "sub" },
+          bitrate: 6.4e8,
+          unrated: 0,
+          routes: [["c1"]],
+          topics: [
+            {
+              topic: "/points",
+              frequency: 10,
+              message_size: 8e6,
+              bitrate: 6.4e8,
+            },
+          ],
+        },
+        {
+          id: "f2",
+          kind: "topics",
+          source: { kind: "compute_unit", name: "sub" },
+          target: { kind: "compute_unit", name: "main" },
+          bitrate: null,
+          unrated: 1,
+          routes: [["c1"]],
+          topics: [{ topic: "/map" }],
+        },
+      ],
+      loads: [
+        {
+          connection: "c1",
+          load: 6.4e8,
+          capacity: 1e9,
+          utilization: 0.64,
+          flows: ["f1"],
+        },
+      ],
+    },
+  },
+};
+
+test("units view: one line per peripheral and unit and per pair of units, both directions on it", () => {
+  const model = wiring.model(ANALYSED);
+  const lines = wiring.unitLines(model.analysis.get("default").flows);
+  assert.deepEqual(
+    lines.map((l) => [l.id, l.forward?.id, l.backward?.id ?? null]),
+    [
+      ["p:lidar|main", "f0", null],
+      ["u:main|sub", "f1", "f2"],
+    ],
+  );
+  const flows = wiring.unitFlows(model.analysis.get("default").flows, "main");
+  assert.deepEqual(
+    flows.inputs.map((f) => f.id),
+    ["f0", "f2"],
+  );
+  assert.deepEqual(
+    flows.outputs.map((f) => f.id),
+    ["f1"],
+  );
+
+  const shape = wiring.unitLayout(model, "default");
+  assert.deepEqual(
+    shape.units.map((u) => [u.id, u.device]),
+    [
+      ["main", "ecu_a"],
+      ["sub", "ecu_b"],
+    ],
+  );
+  const arc = shape.lines.find((l) => l.id === "u:main|sub");
+  assert.deepEqual(arc.label.lines, ["↓ 640M", "↑ +1?"]);
+  // The peripheral sits beside the unit it feeds.
+  const lidar = shape.peripherals[0];
+  const main = shape.units[0];
+  assert.equal(lidar.y + lidar.h / 2, main.y + main.h / 2);
+});
+
+test("a mode without analysis draws the units and no line", () => {
+  const shape = wiring.unitLayout(wiring.model(ANALYSED), "simulation");
+  assert.equal(shape.units.length, 2);
+  assert.equal(shape.lines.length, 0);
+});
+
+test("a loaded connection shows its load over its capacity and is marked by utilization", () => {
+  assert.deepEqual(wiring.loadOf("1G", { load: 6.4e8, utilization: 0.64 }), {
+    cls: "used",
+    text: "640M/1G",
+  });
+  assert.equal(
+    wiring.loadOf("1G", { load: 8e8, utilization: 0.8 }).cls,
+    "busy",
+  );
+  assert.equal(wiring.loadOf("1G", { load: 2e9, utilization: 2 }).cls, "over");
+  assert.deepEqual(
+    wiring.loadOf("can · 500k", { load: 2e5, utilization: 0.4 }, true).text,
+    "can · 500k · 200k used",
+  );
+  assert.deepEqual(wiring.loadOf("1G", undefined), { cls: "", text: "1G" });
 });

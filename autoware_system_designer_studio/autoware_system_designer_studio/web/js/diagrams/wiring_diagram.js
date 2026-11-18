@@ -1,6 +1,7 @@
 // Wiring diagram: a wiring layout drawn as SVG, with the wires of a time sync
-// domain or of a peripheral's hosts lit over the dimmed rest, and the clicked
-// device or connection reported to its host.
+// domain or of a peripheral's hosts lit over the dimmed rest, the load of a
+// mode's flows on each connection, and the clicked device or connection
+// reported to its host.
 (function () {
   const SD = window.SD;
   const wiring = (SD.wiring ||= {});
@@ -11,11 +12,34 @@
   const ARROW = 5;
   const MIN_ZOOM = 0.3;
   const MAX_ZOOM = 2;
+  // Utilization from which a loaded connection is marked busy.
+  const BUSY = 0.7;
+
+  // Load class and label of a connection: load over capacity, or the capacity alone; a
+  // named label keeps its text and takes the load after it.
+  function loadOf(capacityText, entry, named = false) {
+    if (!entry || !entry.load) return { cls: "", text: capacityText };
+    const load = wiring.formatBitrate(entry.load);
+    const cls =
+      entry.utilization > 1
+        ? "over"
+        : entry.utilization >= BUSY
+          ? "busy"
+          : "used";
+    return {
+      cls,
+      text: named
+        ? `${capacityText} · ${load} used`
+        : `${load}/${capacityText}`,
+    };
+  }
 
   function svg(tag, attributes = {}, className = "") {
     const node = document.createElementNS(NS, tag);
     if (className) node.setAttribute("class", className);
-    Object.entries(attributes).forEach(([key, value]) => node.setAttribute(key, value));
+    Object.entries(attributes).forEach(([key, value]) =>
+      node.setAttribute(key, value),
+    );
     return node;
   }
 
@@ -23,7 +47,12 @@
   // index, `arrows` are wire ends pointing into a device, `badges` the notes
   // per device id, `devices` the marked device ids.
   function syncOverlay(model, layout, domainName) {
-    const overlay = { lit: new Map(), arrows: [], badges: new Map(), devices: new Set() };
+    const overlay = {
+      lit: new Map(),
+      arrows: [],
+      badges: new Map(),
+      devices: new Set(),
+    };
     const wires = new Map(layout.wires.map((wire) => [wire.id, wire]));
     model.timeSync.forEach((domain, index) => {
       if (domainName && domain.name !== domainName) return;
@@ -54,7 +83,12 @@
   }
 
   function peripheralOverlay(model, peripheralName) {
-    const overlay = { lit: new Map(), arrows: [], badges: new Map(), devices: new Set() };
+    const overlay = {
+      lit: new Map(),
+      arrows: [],
+      badges: new Map(),
+      devices: new Set(),
+    };
     model.peripherals.forEach((peripheral) => {
       if (peripheralName && peripheral.name !== peripheralName) return;
       overlay.devices.add(model.owner(peripheral.device));
@@ -75,7 +109,13 @@
     let root = null;
     let zoom = 1;
     let selection = null;
-    let view = { mode: "connections", domain: "", peripheral: "", capacity: true };
+    let view = {
+      mode: "connections",
+      domain: "",
+      peripheral: "",
+      capacity: true,
+      loads: null,
+    };
 
     function applyZoom() {
       if (!root) return;
@@ -90,13 +130,19 @@
 
     function draw() {
       scroller.replaceChildren();
-      root = svg("svg", { viewBox: `0 0 ${layout.width} ${layout.height}` }, "wiring-diagram");
+      root = svg(
+        "svg",
+        { viewBox: `0 0 ${layout.width} ${layout.height}` },
+        "wiring-diagram",
+      );
       root.addEventListener("click", () => onSelect?.(null));
       const layers = {};
-      ["boxes", "runs", "halos", "stubs", "hits", "texts", "overlay"].forEach((name) => {
-        layers[name] = svg("g", {}, `wiring-layer-${name}`);
-        root.appendChild(layers[name]);
-      });
+      ["boxes", "runs", "halos", "stubs", "hits", "texts", "overlay"].forEach(
+        (name) => {
+          layers[name] = svg("g", {}, `wiring-layer-${name}`);
+          root.appendChild(layers[name]);
+        },
+      );
 
       layout.devices.forEach((box) => {
         const rect = svg(
@@ -136,7 +182,11 @@
         line.dataset.device = rail.id;
         line.addEventListener("click", (e) => pick("device", rail.id, e));
         layers.runs.appendChild(line);
-        const label = svg("text", { x: rail.x1 + 4, y: rail.y - 7 }, "wiring-text name");
+        const label = svg(
+          "text",
+          { x: rail.x1 + 4, y: rail.y - 7 },
+          "wiring-text name",
+        );
         label.textContent = rail.label;
         layers.texts.appendChild(label);
       });
@@ -150,7 +200,11 @@
         wire.segments.forEach((s) => {
           const horizontal = s.y1 === s.y2;
           const attributes = { x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2 };
-          const line = svg("line", attributes, `${cls}${horizontal && wire.run ? " run" : ""}`);
+          const line = svg(
+            "line",
+            attributes,
+            `${cls}${horizontal && wire.run ? " run" : ""}`,
+          );
           line.dataset.connection = wire.id;
           (horizontal ? layers.runs : layers.stubs).appendChild(line);
           const hit = svg("line", attributes, "wiring-hit");
@@ -172,7 +226,8 @@
           );
           label.dataset.connection = wire.id;
           // An unknown capacity keeps its place for the rate shown there.
-          label.textContent = wire.label.text || "–";
+          label.dataset.capacity = wire.label.text || "–";
+          label.textContent = label.dataset.capacity;
           layers.texts.appendChild(label);
         }
       });
@@ -206,10 +261,29 @@
       const overlayLayer = root.querySelector(".wiring-layer-overlay");
       overlayLayer.replaceChildren();
       let overlay = null;
-      if (view.mode === "sync") overlay = syncOverlay(model, layout, view.domain);
-      if (view.mode === "peripherals") overlay = peripheralOverlay(model, view.peripheral);
+      if (view.mode === "sync")
+        overlay = syncOverlay(model, layout, view.domain);
+      if (view.mode === "peripherals")
+        overlay = peripheralOverlay(model, view.peripheral);
       root.classList.toggle("dimmed", !!overlay);
       root.classList.toggle("no-capacity", !view.capacity);
+      root
+        .querySelectorAll(".wiring-capacity[data-connection]")
+        .forEach((label) => {
+          const shown = loadOf(
+            label.dataset.capacity,
+            view.loads?.get(label.dataset.connection),
+            label.classList.contains("named"),
+          );
+          label.textContent = shown.text;
+          label.classList.toggle("loaded", !!shown.cls);
+        });
+      root.querySelectorAll(".wiring-wire[data-connection]").forEach((line) => {
+        const entry = view.loads?.get(line.dataset.connection);
+        const shown = loadOf("", entry);
+        if (shown.cls) line.dataset.load = shown.cls;
+        else delete line.dataset.load;
+      });
       root.querySelectorAll(".wiring-wire[data-connection]").forEach((line) => {
         const colour = overlay?.lit.get(line.dataset.connection);
         line.classList.toggle("lit", colour !== undefined);
@@ -217,7 +291,10 @@
         else line.dataset.colour = colour;
       });
       root.querySelectorAll("[data-device]").forEach((node) => {
-        node.classList.toggle("marked", !!overlay?.devices.has(model.owner(node.dataset.device)));
+        node.classList.toggle(
+          "marked",
+          !!overlay?.devices.has(model.owner(node.dataset.device)),
+        );
       });
       if (!overlay) return;
       overlay.arrows.forEach((arrow) => {
@@ -226,7 +303,11 @@
           arrow.dir === "right"
             ? `l${-ARROW * 1.8} ${-ARROW} v${ARROW * 2}`
             : `l${-ARROW} ${sign * ARROW * 1.8} h${ARROW * 2}`;
-        const tip = svg("path", { d: `M${arrow.x} ${arrow.y} ${back} z` }, "wiring-arrow");
+        const tip = svg(
+          "path",
+          { d: `M${arrow.x} ${arrow.y} ${back} z` },
+          "wiring-arrow",
+        );
         tip.dataset.colour = arrow.colour;
         overlayLayer.appendChild(tip);
       });
@@ -248,11 +329,15 @@
 
     function applySelection() {
       if (!root) return;
-      root.querySelectorAll(".selected").forEach((node) => node.classList.remove("selected"));
+      root
+        .querySelectorAll(".selected")
+        .forEach((node) => node.classList.remove("selected"));
       if (!selection) return;
-      const attribute = selection.type === "device" ? "data-device" : "data-connection";
+      const attribute =
+        selection.type === "device" ? "data-device" : "data-connection";
       root.querySelectorAll(`[${attribute}]`).forEach((node) => {
-        if (node.getAttribute(attribute) === selection.id) node.classList.add("selected");
+        if (node.getAttribute(attribute) === selection.id)
+          node.classList.add("selected");
       });
     }
 
@@ -278,13 +363,18 @@
       // Scales the drawing to the width of its container, never above its own size.
       fit() {
         if (!layout || !scroller.clientWidth) return;
-        zoom = Math.min(1, Math.max(MIN_ZOOM, scroller.clientWidth / layout.width));
+        zoom = Math.min(
+          1,
+          Math.max(MIN_ZOOM, scroller.clientWidth / layout.width),
+        );
         applyZoom();
       },
       layout: () => layout,
+      element: scroller,
     };
   }
 
+  wiring.loadOf = loadOf;
   wiring.syncOverlay = syncOverlay;
   wiring.peripheralOverlay = peripheralOverlay;
   wiring.diagram = wiringDiagram;

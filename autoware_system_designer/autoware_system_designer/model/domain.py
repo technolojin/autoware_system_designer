@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional
 
+from autoware_system_designer.common.quantity import parse_scaled
+
 
 class ParameterType(Enum):
     """Parameter type with priority ordering (lower value = lower priority).
@@ -43,6 +45,7 @@ class PortDefinition:
     remap_target: Optional[str] = None
     global_topic: Optional[str] = None  # global ROS topic override (was "global" key)
     topic: Optional[str] = None  # topic a subsystem interface port is bound to; absent from design files
+    message_size: Optional[int] = None  # typical serialized size of one message in bytes (publishers)
 
     @classmethod
     def from_dict(cls, d: dict) -> PortDefinition:
@@ -52,6 +55,7 @@ class PortDefinition:
             message_type=d.get("message_type"),
             remap_target=d.get("remap_target"),
             global_topic=d.get("global"),
+            message_size=parse_scaled(d.get("message_size")),
         )
 
 

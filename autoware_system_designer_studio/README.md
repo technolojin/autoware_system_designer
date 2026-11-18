@@ -68,13 +68,13 @@ selector, the mode, which every activity reads, and the launch bar; other select
 live in the activity that uses them, as store keys mirrored in the URL. The system selector lists
 the systems of the site by package, each with its icon.
 
-| Activity | Rail items                                                   | Side panel                                      | Main area                                            |
-| -------- | ------------------------------------------------------------ | ----------------------------------------------- | ---------------------------------------------------- |
-| Explore  | Diagrams: Nodes, Logic, Sequence (`?diagram=`)               | depth, entity search, image download (PNG, SVG) | diagram canvas; inspector shows the selected element |
-| Launch   | Launch: Control; Monitor: Logs, Topics, Resources (`?view=`) | none                                            | the view of the mode                                 |
-| Replay   | Replay                                                       | scope tree (`?scope=`)                          | boundary, bag match, configuration, run (daemon)     |
-| E/E      | E/E                                                          | architecture, lit view, environments            | wiring diagram; inspector shows the selected element |
-| Build    | Build                                                        | target, compute unit, start; job list (daemon)  | log of the selected job (`?job=`)                    |
+| Activity | Rail items                                                   | Side panel                                      | Main area                                                     |
+| -------- | ------------------------------------------------------------ | ----------------------------------------------- | ------------------------------------------------------------- |
+| Explore  | Diagrams: Nodes, Logic, Sequence (`?diagram=`)               | depth, entity search, image download (PNG, SVG) | diagram canvas; inspector shows the selected element          |
+| Launch   | Launch: Control; Monitor: Logs, Topics, Resources (`?view=`) | none                                            | the view of the mode                                          |
+| Replay   | Replay                                                       | scope tree (`?scope=`)                          | boundary, bag match, configuration, run (daemon)              |
+| E/E      | E/E                                                          | architecture, view, load, environments          | wiring or units diagram; inspector shows the selected element |
+| Build    | Build                                                        | target, compute unit, start; job list (daemon)  | log of the selected job (`?job=`)                             |
 
 The E/E activity draws an E/E architecture the system is declared for (`?architecture=`) from the
 record in the system's `deployment.json`, laid out from the record alone. Devices hosting an
@@ -86,7 +86,13 @@ connection carries its capacity, a dash where the description gives none. `?wiri
 the paths of the time sync domains from each grandmaster to its members (`?domain=` for one),
 `?wiring=peripherals` the paths from each peripheral to the hosts of its nodes (`?peripheral=`).
 Compute units are listed per environment in the side panel and in the inspector of a device. An
-architecture without connections is drawn with its devices joined by their networks.
+architecture without connections is drawn with its devices joined by their networks. With the
+analysis of the top bar's mode, each connection shows its load over its capacity, marked when
+busy or over it; the inspector of a connection lists the flows on it. `?wiring=units` draws the
+compute units inside their devices, the peripherals beside the unit whose node drives them, and
+one line per peripheral and unit and per pair of units exchanging topics, with the rate each way;
+the inspector of a line lists its topics with their rate and size, and of a unit its flows in and
+out.
 
 The launch bar is the Launch activity's part of the top bar, shown on every activity: its drawer
 toggle, with a daemon launch of every unit of the shown mode and deploy and shutdown of every

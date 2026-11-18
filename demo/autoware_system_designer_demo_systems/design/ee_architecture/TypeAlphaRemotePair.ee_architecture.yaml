@@ -9,6 +9,8 @@ base: TypeAlphaBridge.ee_architecture
 remove:
   devices:
     - name: ecu_c
+  connections:
+    - name: ecu_c_vehicle
 
 override:
   devices:
@@ -16,8 +18,12 @@ override:
       hardware: x86_64
       interfaces:
         - name: eth0
+          bitrate: 1G
           network: vehicle
           address: 172.30.87.12
+        - name: can0
+          type: can
+          bitrate: 500k
       environments:
         - name: map_localization
           kind: container

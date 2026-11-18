@@ -1,4 +1,4 @@
-autoware_system_design_format: 0.4.0
+autoware_system_design_format: 0.5.0
 
 name: CameraDummyDriver.node
 
@@ -17,13 +17,16 @@ subscribers: []
 publishers:
   - name: image
     message_type: std_msgs/msg/UInt8MultiArray
+    message_size: 6.2M
     qos:
       reliability: best_effort
       durability: volatile
   - name: compressed_image
     message_type: std_msgs/msg/ByteMultiArray
+    message_size: 600k
   - name: camera_info
     message_type: std_msgs/msg/Header
+    message_size: 400
 
 param_files: []
 
@@ -31,6 +34,10 @@ param_values:
   - name: composable_node
     type: bool
     default: false
+  - name: device
+    type: string
+    default: ""
+    description: Interface of the camera link on the host.
 
 # processes
 processes:

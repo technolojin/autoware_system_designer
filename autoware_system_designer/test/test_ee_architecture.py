@@ -35,9 +35,7 @@ autoware_system_design_format: 0.5.0
 name: Bench.ee_architecture
 """
 
-TWO_DEVICES = (
-    HEAD
-    + """
+TWO_DEVICES = HEAD + """
 networks:
   - name: control
     subnet: 10.0.1.0/24
@@ -63,11 +61,8 @@ bindings:
   - {compute_unit: main_ecu, environment: ecu_a/host}
   - {compute_unit: sub_ecu, environment: ecu_b/host}
 """
-)
 
-ONE_DEVICE = (
-    HEAD
-    + """
+ONE_DEVICE = HEAD + """
 devices:
   - name: ecu
     environments:
@@ -80,7 +75,6 @@ bindings:
   - {compute_unit: main_ecu, environment: ecu/main}
   - {compute_unit: sub_ecu, environment: ecu/sub}
 """
-)
 
 
 def _system():
@@ -161,9 +155,7 @@ def test_remote_environment_needs_an_address(tmp_path):
 
 
 def test_one_environment_needs_no_daemon_port_or_main(tmp_path):
-    text = (
-        HEAD
-        + """
+    text = HEAD + """
 devices:
   - name: pc
     environments:
@@ -173,7 +165,6 @@ bindings:
   - {compute_unit: main_ecu, environment: pc/host}
   - {compute_unit: sub_ecu, environment: pc/host}
 """
-    )
     record = _resolve(tmp_path, text)
     assert record["main_environment"] is None
     assert record["environments"][0]["compute_units"] == ["main_ecu", "sub_ecu"]
@@ -323,20 +314,15 @@ def test_binding_needs_an_environment_providing_what_the_unit_requires(tmp_path)
 
 DEVICE_HEAD = "autoware_system_design_format: 0.5.0\n\nname: %s.device\n"
 
-SWITCH_DEVICE = (
-    DEVICE_HEAD % "Switch"
-    + """
+SWITCH_DEVICE = DEVICE_HEAD % "Switch" + """
 role: switch
 interfaces:
   - {name: p0, bitrate: 10G}
   - {name: p1, bitrate: 10G}
   - {name: p2, bitrate: 10G}
 """
-)
 
-BOARD_DEVICE = (
-    DEVICE_HEAD % "Board"
-    + """
+BOARD_DEVICE = DEVICE_HEAD % "Board" + """
 role: ecu
 hardware: x86_64
 interfaces:
@@ -349,11 +335,8 @@ parts:
 connections:
   - link: [eth0, switch.p0]
 """
-)
 
-WIRED = (
-    HEAD
-    + """
+WIRED = HEAD + """
 networks:
   - {name: control, subnet: 10.0.1.0/24, carries: [daemon]}
   - {name: sensor, subnet: 10.0.3.0/24}
@@ -406,7 +389,6 @@ bindings:
   - {peripheral: lidar_front, device: lidar}
   - {peripheral: vcu, device: vcu}
 """
-)
 
 PERIPHERALS = """
 peripherals:
@@ -488,8 +470,10 @@ def test_peripheral_is_reached_through_the_wiring_from_its_components_unit(tmp_p
             "device": "ecu_a",
             "interface": "eth0",
             "peer_interface": "eth",
+            "peer_address": "10.0.3.9",
             "network": "sensor",
             "address": "10.0.3.1",
+            "data_rate": None,
             "path": ["c0", "c1"],
         }
     ]
@@ -643,3 +627,164 @@ def test_export_resolves_device_entities_of_the_workspace(tmp_path):
     assert [device["id"] for device in record["wiring"]["devices"]][:2] == ["ecu_a", "ecu_a.switch"]
     assert record["peripherals"][0]["hosts"][0]["path"] == ["c0", "c1"]
     assert record["time_sync"][0]["name"] == "ecus"
+
+
+NODE_PERIPHERALS = """
+peripherals:
+  - name: lidar_front
+    node: /talker
+    parameters:
+      - {name: sensor_ip, value: address}
+      - {name: host_ip, value: host_address}
+      - {name: interface, value: host_interface}
+  - name: vcu
+    node: /listener
+    parameters:
+      - {name: can_interface, value: host_interface}
+"""
+
+
+def test_peripheral_bound_by_node_gives_its_parameters(tmp_path):
+    peripherals = {p["name"]: p for p in _resolve_wired(tmp_path, peripherals=NODE_PERIPHERALS)["peripherals"]}
+    lidar = peripherals["lidar_front"]
+    assert (lidar["node"], lidar["component"]) == ("/talker", "talker")
+    assert [(p["argument"], p["resolved"]) for p in lidar["parameters"]] == [
+        ("lidar_front_sensor_ip", "10.0.3.9"),
+        ("lidar_front_host_ip", "10.0.3.1"),
+        ("lidar_front_interface", "eth0"),
+    ]
+    assert [(p["argument"], p["resolved"]) for p in peripherals["vcu"]["parameters"]] == [("vcu_can_interface", "can0")]
+
+
+@pytest.mark.parametrize(
+    "peripherals, expected",
+    [
+        (
+            "peripherals:\n  - name: vcu\n    node: /listener\n    parameters:\n      - {name: ip, value: address}\n",
+            "gives parameter 'ip' its address, which device 'vcu' has none of",
+        ),
+        ("peripherals:\n  - {name: vcu, node: /nowhere/driver}\n", "names node '/nowhere/driver'"),
+    ],
+)
+def test_peripheral_parameter_rules(tmp_path, peripherals, expected):
+    text = WIRED.replace("  - {peripheral: lidar_front, device: lidar}\n", "")
+    assert expected in _wired_rejected(tmp_path, text, peripherals)
+
+
+def _structure(message_size: int) -> dict:
+    """System structure of one mode: the talker on main_ecu publishing to the listener on sub_ecu."""
+    return {
+        "children": [
+            {"path": "/talker", "compute_unit": "main_ecu"},
+            {"path": "/listener", "compute_unit": "sub_ecu"},
+        ],
+        "links": [
+            {
+                "topic": "/chatter",
+                "msg_type": "std_msgs/msg/String",
+                "from_port": {
+                    "role": "publisher",
+                    "port_path": "/talker/output/chatter",
+                    "message_size": message_size,
+                    "event": {"frequency": 10.0},
+                },
+                "to_port": {"role": "subscriber", "port_path": "/listener/input/chatter"},
+            }
+        ],
+    }
+
+
+def _analysed(tmp_path: Path, message_size: int) -> dict:
+    text = WIRED.replace(
+        "{name: eth, network: sensor, address: 10.0.3.9}",
+        "{name: eth, network: sensor, address: 10.0.3.9, data_rate: 100M}",
+    )
+    system = _system_with_peripherals(tmp_path)
+    return resolve_ee_architecture(
+        _architecture(tmp_path, text), system, _device_lookup(tmp_path), {"default": _structure(message_size)}
+    )
+
+
+def test_analysis_has_a_flow_per_peripheral_and_unit_pair_and_the_load_per_direction(tmp_path):
+    record = _analysed(tmp_path, 1000)
+    analysis = record["analysis"]["default"]
+    flows = {(f["source"]["name"], f["target"]["name"]): f for f in analysis["flows"]}
+    assert flows[("lidar_front", "main_ecu")]["bitrate"] == 10**8
+    chatter = flows[("main_ecu", "sub_ecu")]
+    assert (chatter["kind"], chatter["bitrate"], chatter["unrated"], chatter["local"]) == ("topics", 80000, 0, False)
+    assert [t["topic"] for t in chatter["topics"]] == ["/chatter"]
+    # The vcu sends no declared rate; its flow is listed without load.
+    assert flows[("vcu", "sub_ecu")]["bitrate"] is None
+
+    names = {c["id"]: c["endpoints"] for c in record["wiring"]["connections"]}
+    loads = {c["connection"]: c for c in analysis["loads"]}
+    lidar_link = next(i for i, e in names.items() if {"device": "lidar", "interface": "eth"} in e)
+    ecu_link = next(i for i, e in names.items() if {"device": "ecu_b", "interface": "eth0"} in e)
+    assert loads[lidar_link]["load"] == 10**8
+    assert loads[ecu_link]["directions"] == [{"from": "ecu_a.switch", "load": 80000}]
+    # The switch port of 10G bounds the link.
+    assert loads[ecu_link]["utilization"] == pytest.approx(80000 / 10**10)
+
+
+def test_load_over_capacity_warns(tmp_path):
+    records = []
+    handler = logging.Handler(logging.WARNING)
+    handler.emit = records.append
+    logger = logging.getLogger("autoware_system_designer.builder.ee_architecture")
+    logger.addHandler(handler)
+    try:
+        _analysed(tmp_path, 200 * 10**6)
+    finally:
+        logger.removeHandler(handler)
+    assert any("over its capacity of 1000000000 bit/s" in record.getMessage() for record in records)
+
+
+def _stage_with_peripheral(tmp_path: Path, deploy_architecture: str) -> Path:
+    workspace = stage_case("compute_units", tmp_path)
+    package = workspace / "units_pkg"
+    system = package / "Multi.system.yaml"
+    system.write_text(
+        system.read_text().replace(
+            "\ncomponents:\n",
+            "\nperipherals:\n  - name: lidar\n    node: /talker\n    parameters:\n"
+            "      - {name: sensor_ip, value: address}\n\ncomponents:\n",
+            1,
+        )
+    )
+    architecture = (
+        TWO_DEVICES.replace(
+            "\nmain_environment:",
+            "  - name: lidar\n    role: sensor\n    interfaces:\n      - {name: eth, network: control, address: 10.0.1.9}\n"
+            "\nmain_environment:",
+        )
+        + "  - {peripheral: lidar, device: lidar}\n"
+    )
+    (package / "Bench.ee_architecture.yaml").write_text(architecture)
+    (package / "multi.deployments.yaml").write_text(
+        "autoware_system_design_format: 0.5.0\n\nbase: Multi.system\n\n"
+        "ee_architectures: [Bench.ee_architecture]\n\ndeploy_list:\n"
+        f"  - name: bench\n    ee_architecture: {deploy_architecture}\n  - name: spare\n"
+    )
+    return workspace
+
+
+def test_deploy_takes_peripheral_arguments_from_its_architecture(tmp_path):
+    workspace = _stage_with_peripheral(tmp_path, "Bench.ee_architecture")
+    run = run_pipeline(workspace, "units_pkg/multi.deployments.yaml", tmp_path)
+
+    artifacts = load_build_artifacts(str(run.out_root), run.system_name)
+    deploys = {d["name"]: d for d in artifacts.deploy_variants}
+    assert deploys["bench"]["ee_architecture"] == "Bench"
+    assert deploys["bench"]["arguments"] == [{"name": "lidar_sensor_ip", "value": "10.0.1.9"}]
+    assert deploys["spare"]["arguments"] == []
+    talker = next(c for c in run.structure("default")["data"]["children"] if c["name"] == "talker")
+    assert {"name": "sensor_ip", "value": "$(var lidar_sensor_ip)"}.items() <= next(
+        p for p in talker["parameters"] if p["name"] == "sensor_ip"
+    ).items()
+
+
+def test_deploy_naming_an_unlisted_architecture_fails(tmp_path):
+    workspace = _stage_with_peripheral(tmp_path, "Ghost.ee_architecture")
+    with pytest.raises(Exception) as excinfo:
+        run_pipeline(workspace, "units_pkg/multi.deployments.yaml", tmp_path)
+    assert "names E/E architecture 'Ghost'" in str(excinfo.value)
