@@ -181,6 +181,7 @@ class ServeDaemon:
         port: int,
         served_units: Optional[Iterable[str]] = None,
         environment: Optional[architecture.EnvironmentBinding] = None,
+        ssh_config: Optional[Path] = None,
         workspace: Optional[Path] = None,
         record_root: Optional[Path] = None,
         log_root: Optional[Path] = None,
@@ -210,7 +211,9 @@ class ServeDaemon:
         self.heartbeat_s = heartbeat_s
         self.hub = events.EventHub(max_event_subscribers, heartbeat_s)
         self.jobs = jobs.JobRunner(self.hub)
-        self.peers = peers.PeerRegistry(peer_specs, self.hub, self._describe, self.jobs, self.served_units or (), port)
+        self.peers = peers.PeerRegistry(
+            peer_specs, self.hub, self._describe, self.jobs, self.served_units or (), port, ssh_config
+        )
         self.methods = api.MethodRegistry()
         self.methods.register("health", self._health, get_path="health")
         self.methods.register("systems.list", self._systems_list, get_path="systems")

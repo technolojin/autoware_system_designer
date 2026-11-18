@@ -105,6 +105,11 @@ def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
         help="SSH destination the unit's peer is forwarded from, for a peer on another device (repeatable)",
     )
     serve.add_argument(
+        "--ssh-config",
+        type=Path,
+        help="SSH configuration file of the forwards to peers on other devices (default: the user's)",
+    )
+    serve.add_argument(
         "--site-file",
         type=Path,
         help="YAML file naming 'ee_architecture' and 'environment' of this daemon and binding compute units to "
@@ -160,21 +165,24 @@ def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
     )
 
     environment = commands.add_parser(
-        "environment", help="print what an E/E architecture gives the daemon of an environment, as JSON"
+        "environment",
+        help="print what an E/E architecture gives the daemon of an environment, or its environments, as JSON",
     )
     _add_common(environment)
     _add_environment(environment)
 
     args = parser.parse_args(argv)
-    if (args.command in ("serve", "environment")) and (args.ee_architecture is None) != (args.environment is None):
+    if args.command == "serve" and (args.ee_architecture is None) != (args.environment is None):
         parser.error("--ee-architecture and --environment go together")
     if args.command == "environment" and args.ee_architecture is None:
-        parser.error("--ee-architecture and --environment are required")
+        parser.error("--ee-architecture is required")
     if args.command == "serve":
         if args.port is not None and not 0 <= args.port <= 65535:
             serve.error("--port must be within 0..65535")
         if args.rviz_config is not None and not args.rviz_config.is_file():
             serve.error(f"--rviz-config {args.rviz_config} is not a file")
+        if args.ssh_config is not None and not args.ssh_config.is_file():
+            serve.error(f"--ssh-config {args.ssh_config} is not a file")
         if args.heartbeat_interval <= 0:
             serve.error("--heartbeat-interval must be positive")
         try:
@@ -182,8 +190,6 @@ def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
             args.site_peers = [] if site_file is None else peers.load_site_file(site_file)
             args.flag_peers = [peers.parse_peer(text) for text in args.peers]
             args.flag_peer_ssh = [peers.parse_peer_ssh(text) for text in args.peer_ssh]
-            if site_file is not None:
-                args.flag_peer_ssh = peers.load_site_peer_ssh(site_file) + args.flag_peer_ssh
             if site_file is not None and args.ee_architecture is None:
                 args.ee_architecture, args.environment = peers.load_site_environment(site_file)
                 if (args.ee_architecture is None) != (args.environment is None):
@@ -285,8 +291,16 @@ def _run_serve(args: argparse.Namespace) -> None:
 
 
 def _run_environment(args: argparse.Namespace) -> None:
-    binding = _environment_binding(args, _install_root(args))
-    print(json.dumps(binding.to_view(), indent=2), flush=True)
+    install_root = _install_root(args)
+    if args.environment is not None:
+        view = _environment_binding(args, install_root).to_view()
+    else:
+        systems, _ = discover_systems(install_root)
+        try:
+            view = architecture.describe(systems, args.ee_architecture)
+        except architecture.ArchitectureError as exc:
+            sys.exit(str(exc))
+    print(json.dumps(view, indent=2), flush=True)
 
 
 def _daemon(
@@ -303,6 +317,7 @@ def _daemon(
         port=port,
         served_units=served_units,
         environment=binding,
+        ssh_config=args.ssh_config,
         workspace=resolve_workspace(install_root, args.workspace),
         record_root=args.record_dir,
         bag_dirs=args.bag_dirs,

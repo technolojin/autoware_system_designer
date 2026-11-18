@@ -116,6 +116,15 @@
                       "type": "boolean",
                       "description": "Shares the device's shared memory with the other environments of the device that set it (default false)"
                     },
+                    "provides": {
+                      "type": "array",
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]*$"
+                      },
+                      "description": "Capabilities the environment provides to the compute units bound to it (e.g. gpu)"
+                    },
                     "daemon_port": {
                       "type": "integer",
                       "minimum": 1,
@@ -274,6 +283,15 @@
                 "shared_memory": {
                   "type": "boolean",
                   "description": "Shares the device's shared memory with the other environments of the device that set it (default false)"
+                },
+                "provides": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*$"
+                  },
+                  "description": "Capabilities the environment provides to the compute units bound to it (e.g. gpu)"
                 },
                 "daemon_port": {
                   "type": "integer",

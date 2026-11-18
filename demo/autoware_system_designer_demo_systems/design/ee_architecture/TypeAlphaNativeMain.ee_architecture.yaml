@@ -1,0 +1,28 @@
+autoware_system_design_format: 0.5.0
+
+name: TypeAlphaNativeMain.ee_architecture
+
+description: TypeAlphaHost with sensing_perception on the ECU's operating system, beside the containers of the other units.
+
+base: TypeAlphaHost.ee_architecture
+
+override:
+  devices:
+    - name: ecu
+      hardware: x86_64
+      environments:
+        - name: host
+          shared_memory: true
+          daemon_port: 8781
+        - name: map_localization
+          kind: container
+          shared_memory: true
+          daemon_port: 8782
+        - name: planning_control
+          kind: container
+          shared_memory: true
+          daemon_port: 8783
+  main_environment: ecu/host
+  bindings:
+    - compute_unit: sensing_perception
+      environment: ecu/host

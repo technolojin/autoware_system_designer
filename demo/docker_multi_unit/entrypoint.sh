@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Container entry of the multi-unit environment.
-#   build   colcon build of ASD_PACKAGES and their dependencies from /ws/src into /ws/out
-#   serve   studio daemon of the units ASD_COMPUTE_UNITS on ASD_PORT, with sshd when ASD_SSHD_PORT
-#           is set; with ASD_MAIN=true it has the daemons of the other units as peers, bound by
-#           the site file in /run/asd/site; ASD_RMW_IMPLEMENTATION selects the RMW implementation
+#   build     colcon build of ASD_PACKAGES and their dependencies from /ws/src into /ws/out
+#   describe  the E/E architecture named by the argument, as the built workspace exports it
+#   serve     studio daemon of the environment ASD_ENVIRONMENT of the E/E architecture
+#             ASD_EE_ARCHITECTURE, with an sshd on ASD_SSHD_PORT when ASD_SSHD is true;
+#             ASD_RMW_IMPLEMENTATION selects the RMW implementation; with ASD_INSTALL_ROOT it
+#             serves that mounted install tree as it is
 set -eo pipefail
 
 OUT=/ws/out
@@ -46,12 +48,14 @@ CONFIG
   /usr/sbin/sshd -f "${dir}/sshd_config" -E "${dir}/sshd.log"
 }
 
-# SSH client configuration of the daemon's user: the key and host key handling its peers' sshd take.
+# SSH client configuration of the daemon's user: the user, port, key and host key handling its peers' sshd take.
 write_ssh_config() {
   mkdir -p "${HOME}/.ssh"
   chmod 700 "${HOME}/.ssh"
   cat >"${HOME}/.ssh/config" <<CONFIG
 Host *
+  User asd
+  Port ${ASD_SSHD_PORT}
   IdentityFile ${SITE}/peer_ed25519
   IdentitiesOnly yes
   StrictHostKeyChecking accept-new
@@ -60,37 +64,46 @@ Host *
 CONFIG
 }
 
-serve() {
-  : "${ASD_COMPUTE_UNITS:?compute units this daemon serves}"
+use_workspace() {
   if [[ ! -f "${OUT}/install/setup.bash" ]]; then
     echo "no workspace in ${OUT}; run the build service first" >&2
     exit 1
   fi
   # shellcheck disable=SC1091
   source "${OUT}/install/setup.bash"
+}
+
+describe() {
+  use_workspace
+  exec autoware-system-designer-studio environment \
+    --install-root "${OUT}/install" \
+    --ee-architecture "${1:?E/E architecture}"
+}
+
+serve() {
+  local install="${OUT}/install" studio=autoware-system-designer-studio
+  if [[ -n "${ASD_INSTALL_ROOT:-}" ]]; then
+    install="${ASD_INSTALL_ROOT}"
+    studio="${install}/autoware_system_designer_studio/bin/autoware-system-designer-studio"
+  else
+    use_workspace
+  fi
   if [[ -n "${ASD_RMW_IMPLEMENTATION:-}" ]]; then
     export RMW_IMPLEMENTATION="${ASD_RMW_IMPLEMENTATION}"
   fi
-  if [[ -n "${ASD_SSHD_PORT:-}" ]]; then
+  if [[ "${ASD_SSHD:-}" == true ]]; then
     start_sshd
   fi
-  local unit units=() peers=()
-  for unit in ${ASD_COMPUTE_UNITS}; do
-    units+=(--compute-unit "${unit}")
-  done
-  if [[ "${ASD_MAIN:-}" == true ]]; then
-    write_ssh_config
-    peers=(--site-file "${SITE}/peers.site.yaml")
-  fi
-  exec autoware-system-designer-studio serve \
-    --install-root "${OUT}/install" \
-    --port "${ASD_PORT:?port of this daemon}" \
-    "${units[@]}" \
-    "${peers[@]}"
+  write_ssh_config
+  exec "${studio}" serve \
+    --install-root "${install}" \
+    --ee-architecture "${ASD_EE_ARCHITECTURE:?E/E architecture of the environment}" \
+    --environment "${ASD_ENVIRONMENT:?environment of this daemon}"
 }
 
 case "${1:-serve}" in
   build) build ;;
+  describe) describe "${2:-}" ;;
   serve) serve ;;
   *) exec "$@" ;;
 esac

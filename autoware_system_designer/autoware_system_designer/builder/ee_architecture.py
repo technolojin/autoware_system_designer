@@ -61,6 +61,11 @@ def system_units(system_config: SystemConfig) -> Dict[str, str]:
     return units
 
 
+def system_requirements(system_config: SystemConfig) -> Dict[str, List[str]]:
+    """Capabilities each declared compute unit of a system requires of its environment."""
+    return {unit.name: list(unit.requires) for unit in system_config.compute_units or []}
+
+
 def cross_unit_pairs(system_config: SystemConfig) -> Set[Tuple[str, str]]:
     """Pairs of compute units a connection crosses, in any mode of the system."""
     mode_names, _ = select_modes(system_config)
@@ -164,13 +169,14 @@ class _Resolver:
                     "address": address,
                     "shared_memory": bool(environment.get("shared_memory", False)),
                     "daemon_port": environment.get("daemon_port"),
+                    "provides": list(environment.get("provides") or []),
                     "compute_units": [],
                 }
         repeated = _duplicates(addresses)
         if repeated:
             raise self.fail(f"address(es) {repeated} are assigned more than once")
 
-    def bind(self, units: Dict[str, str], system_name: str) -> None:
+    def bind(self, units: Dict[str, str], requirements: Dict[str, List[str]], system_name: str) -> None:
         bindings = self.architecture.bindings or []
         repeated = _duplicates(binding["compute_unit"] for binding in bindings)
         if repeated:
@@ -183,6 +189,11 @@ class _Resolver:
                 raise self.fail(f"binds '{unit}', an {units[unit]} compute unit of system '{system_name}'")
             if key not in self.environments:
                 raise self.fail(f"binds '{unit}' to undeclared environment '{key}' {sorted(self.environments)}")
+            missing = [name for name in requirements.get(unit, []) if name not in self.environments[key]["provides"]]
+            if missing:
+                raise self.fail(
+                    f"binds '{unit}' to environment '{key}', which does not provide {missing} the unit requires"
+                )
             self.environments[key]["compute_units"].append(unit)
         bound = {binding["compute_unit"] for binding in bindings}
         unbound = [unit for unit, kind in units.items() if kind == KIND_ONBOARD and unit not in bound]
@@ -251,14 +262,14 @@ class _Resolver:
 def resolve_ee_architecture(architecture: EeArchitectureConfig, system_config: SystemConfig) -> Dict[str, Any]:
     """Check an E/E architecture against a system and return its export record.
 
-    Every onboard compute unit is bound to exactly one declared environment and
-    no offboard unit is bound. With units in several environments, each has a
+    Every onboard compute unit is bound to exactly one declared environment,
+    which provides what the unit requires, and no offboard unit is bound. With units in several environments, each has a
     distinct daemon port and one reachable from the main environment.
     """
     resolver = _Resolver(architecture)
     resolver.read_networks()
     resolver.read_devices()
-    resolver.bind(system_units(system_config), system_config.name)
+    resolver.bind(system_units(system_config), system_requirements(system_config), system_config.name)
     main = resolver.check_daemons()
     for warning in resolver.warn_shared_memory(cross_unit_pairs(system_config)):
         logger.warning(warning)

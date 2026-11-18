@@ -40,9 +40,9 @@ devices:
 main_environment: ecu_a/host
 
 bindings:
-  - compute_unit: main_ecu
+  - compute_unit: sensing_perception
     environment: ecu_a/host
-  - compute_unit: sub_ecu_1
+  - compute_unit: map_localization
     environment: ecu_b/host
-  - compute_unit: sub_ecu_2
+  - compute_unit: planning_control
     environment: ecu_c/host

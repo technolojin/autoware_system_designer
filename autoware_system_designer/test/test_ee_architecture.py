@@ -286,3 +286,27 @@ def test_deployment_naming_an_unknown_architecture_fails(tmp_path):
     with pytest.raises(Exception) as excinfo:
         run_pipeline(workspace, "units_pkg/multi.deployments.yaml", tmp_path)
     assert "Ghost" in str(excinfo.value)
+
+
+def _system_requiring(tmp_path: Path, unit: str, capability: str):
+    text = SYSTEM.read_text().replace(f"  - name: {unit}\n", f"  - name: {unit}\n    requires: [{capability}]\n", 1)
+    assert capability in text
+    path = tmp_path / SYSTEM.name
+    path.write_text(text)
+    return ConfigParser().parse_entity_file(str(path))
+
+
+def test_binding_needs_an_environment_providing_what_the_unit_requires(tmp_path):
+    system = _system_requiring(tmp_path, "sub_ecu", "gpu")
+    with pytest.raises(ValidationError) as excinfo:
+        resolve_ee_architecture(_architecture(tmp_path, TWO_DEVICES), system)
+    assert "binds 'sub_ecu' to environment 'ecu_b/host', which does not provide ['gpu']" in str(excinfo.value)
+
+    provided = TWO_DEVICES.replace(
+        "{name: host, daemon_port: 8782}", "{name: host, daemon_port: 8782, provides: [gpu]}"
+    )
+    record = resolve_ee_architecture(_architecture(tmp_path, provided), system)
+    assert {environment["id"]: environment["provides"] for environment in record["environments"]} == {
+        "ecu_a/host": [],
+        "ecu_b/host": ["gpu"],
+    }

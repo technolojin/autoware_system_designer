@@ -1,0 +1,16 @@
+autoware_system_design_format: 0.5.0
+
+name: TypeAlphaSharedEnvironment.ee_architecture
+
+description: TypeAlphaBridge without ecu_c; map_localization and planning_control share the environment of ecu_b.
+
+base: TypeAlphaBridge.ee_architecture
+
+remove:
+  devices:
+    - name: ecu_c
+
+override:
+  bindings:
+    - compute_unit: planning_control
+      environment: ecu_b/host

@@ -72,7 +72,6 @@ SITE_FILE_ENV = "AUTOWARE_SYSTEM_DESIGNER_SITE_FILE"
 SITE_PEERS_KEY = "peers"
 SITE_ARCHITECTURE_KEY = "ee_architecture"
 SITE_ENVIRONMENT_KEY = "environment"
-SITE_PEER_SSH_KEY = "peer_ssh"
 
 PEER_CONNECTING = "connecting"
 PEER_CONNECTED = "connected"
@@ -235,22 +234,6 @@ def load_site_environment(path: Path) -> tuple[Optional[str], Optional[str]]:
     return architecture, environment
 
 
-def load_site_peer_ssh(path: Path) -> list[tuple[str, str]]:
-    """SSH destinations a site file gives the peers of compute units, whatever names their URL."""
-    bindings = _read_site_file(path).get(SITE_PEER_SSH_KEY) or {}
-    if not isinstance(bindings, dict):
-        raise PeerConfigError(f"site file {path}: {SITE_PEER_SSH_KEY} must map compute units to SSH destinations")
-    found = []
-    for unit, destination in bindings.items():
-        if not isinstance(unit, str) or not isinstance(destination, str):
-            raise PeerConfigError(f"site file {path}: {SITE_PEER_SSH_KEY} of {unit!r} must be a destination")
-        try:
-            found.append((unit, parse_destination(destination)))
-        except PeerConfigError as exc:
-            raise PeerConfigError(f"site file {path}: {exc}") from exc
-    return found
-
-
 def load_site_file(path: Path) -> list[PeerSpec]:
     """Peer bindings of a site file."""
     content = _read_site_file(path)
@@ -399,8 +382,9 @@ class PeerClient:
 class PeerTunnel:
     """The SSH forward a peer's address answers on, kept running as a job; ``job`` is the current one."""
 
-    def __init__(self, url: str, destination: str, runner: jobs.JobRunner) -> None:
+    def __init__(self, url: str, destination: str, runner: jobs.JobRunner, config: Optional[Path] = None) -> None:
         self.destination = destination
+        self._config = config
         self.job: Optional[jobs.Job] = None
         self._port = urlsplit(url).port
         self._runner = runner
@@ -408,7 +392,8 @@ class PeerTunnel:
     def argv(self) -> list[str]:
         forward = f"127.0.0.1:{self._port}:127.0.0.1:{self._port}"
         options = [arg for option in SSH_OPTIONS for arg in ("-o", option)]
-        return [shutil.which(SSH) or SSH, "-N", *options, "-L", forward, "--", self.destination]
+        config = [] if self._config is None else ["-F", str(self._config)]
+        return [shutil.which(SSH) or SSH, *config, "-N", *options, "-L", forward, "--", self.destination]
 
     async def run(self) -> None:
         delay = TUNNEL_RESTART_MIN_S
@@ -862,6 +847,7 @@ class PeerRegistry:
         runner: jobs.JobRunner,
         local_units: Iterable[str] = (),
         port: int = 0,
+        ssh_config: Optional[Path] = None,
     ) -> None:
         specs = merge_specs(specs)
         validate_specs(specs, local_units, port)
@@ -870,7 +856,13 @@ class PeerRegistry:
             units_by_url.setdefault(spec.url, []).append(spec.unit)
         ssh_by_url = {spec.url: spec.ssh for spec in specs}
         self.links = [
-            PeerLink(url, units, hub, describe, PeerTunnel(url, ssh_by_url[url], runner) if ssh_by_url[url] else None)
+            PeerLink(
+                url,
+                units,
+                hub,
+                describe,
+                PeerTunnel(url, ssh_by_url[url], runner, ssh_config) if ssh_by_url[url] else None,
+            )
             for url, units in units_by_url.items()
         ]
         self._by_unit = {unit: link for link in self.links for unit in link.units}

@@ -140,7 +140,7 @@ def test_serve_takes_the_environment_from_flags_or_the_site_file(tmp_path, monke
     assert (args.ee_architecture, args.environment) == ("Bench", "ecu_a/main")
     binding = cli._environment_binding(args, install)
     # The site file's binding and the flag's destination replace the architecture's, unit by unit.
-    assert cli._peer_specs(args, binding.peers) == [
+    assert cli._peer_specs(args, binding.peers, binding.units, binding.port) == [
         PeerSpec("sub_ecu_1", "http://127.0.0.1:8782", "ecu-a-sub"),
         PeerSpec("sub_ecu_2", "http://127.0.0.1:8783", "10.0.1.3"),
         PeerSpec("sub_ecu_3", "http://127.0.0.1:9000"),
@@ -151,3 +151,15 @@ def test_serve_takes_the_environment_from_flags_or_the_site_file(tmp_path, monke
     site.write_text("ee_architecture: Bench\n")
     with pytest.raises(SystemExit):
         cli._parse_args(["serve", "--site-file", str(site)])
+
+
+def test_environment_command_prints_the_architecture_without_an_environment(tmp_path, capsys):
+    install = _install(tmp_path)
+    cli.main(["environment", "--install-root", str(install), "--ee-architecture", "Bench"])
+    view = json.loads(capsys.readouterr().out)
+    assert (view["name"], view["main_environment"]) == ("Bench", "ecu_a/main")
+    assert {environment["id"]: environment["compute_units"] for environment in view["environments"]} == {
+        environment["id"]: environment["compute_units"] for environment in RECORD["environments"]
+    }
+    with pytest.raises(SystemExit, match="no exported system is declared"):
+        cli.main(["environment", "--install-root", str(install), "--ee-architecture", "Other"])

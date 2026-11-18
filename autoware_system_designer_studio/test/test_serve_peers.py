@@ -710,3 +710,11 @@ def test_the_last_reported_session_of_an_unanswering_peer_is_forgotten(tmp_path,
     finally:
         thawed.set()
         running.close()
+
+
+def test_tunnel_reads_the_ssh_configuration_it_is_given(tmp_path):
+    config = tmp_path / "ssh_config"
+    argv = peers.PeerTunnel("http://127.0.0.1:8783", "sub-ecu", None, config).argv()
+    assert argv[1:3] == ["-F", str(config)]
+    assert argv[-2:] == ["--", "sub-ecu"]
+    assert "-F" not in peers.PeerTunnel("http://127.0.0.1:8783", "sub-ecu", None).argv()

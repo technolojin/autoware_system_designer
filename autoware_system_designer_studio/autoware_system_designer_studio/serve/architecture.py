@@ -88,6 +88,28 @@ def _units(environment: dict[str, Any]) -> list[str]:
     return [unit for unit in units if isinstance(unit, str)] if isinstance(units, list) else []
 
 
+def describe(systems: Iterable[SystemExport], architecture: str) -> dict[str, Any]:
+    """Environments of ``architecture`` with the compute units of every system declared for it."""
+    name = architecture_name(architecture)
+    found = architectures(systems)
+    if name not in found:
+        raise ArchitectureError(
+            f"no exported system is declared for E/E architecture {name!r} (found: {sorted(found)})"
+        )
+    environments: dict[str, dict[str, Any]] = {}
+    for record in found[name]:
+        for key, environment in _environments(record).items():
+            merged = environments.setdefault(key, {**environment, "compute_units": []})
+            merged["compute_units"] += [unit for unit in _units(environment) if unit not in merged["compute_units"]]
+    return {
+        "name": name,
+        "main_environment": found[name][0].get("main_environment"),
+        "networks": found[name][0].get("networks") or [],
+        "devices": found[name][0].get("devices") or [],
+        "environments": list(environments.values()),
+    }
+
+
 def resolve(systems: Iterable[SystemExport], architecture: str, environment: str) -> EnvironmentBinding:
     """Binding of ``environment`` in ``architecture``, over every system declared for it."""
     name = architecture_name(architecture)

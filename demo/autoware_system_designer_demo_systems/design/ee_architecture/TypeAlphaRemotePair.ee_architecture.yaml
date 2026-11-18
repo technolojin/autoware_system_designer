@@ -1,0 +1,34 @@
+autoware_system_design_format: 0.5.0
+
+name: TypeAlphaRemotePair.ee_architecture
+
+description: TypeAlphaBridge without ecu_c; map_localization and planning_control run in two containers of ecu_b.
+
+base: TypeAlphaBridge.ee_architecture
+
+remove:
+  devices:
+    - name: ecu_c
+
+override:
+  devices:
+    - name: ecu_b
+      hardware: x86_64
+      interfaces:
+        - name: eth0
+          network: vehicle
+          address: 172.30.87.12
+      environments:
+        - name: map_localization
+          kind: container
+          shared_memory: true
+          daemon_port: 8782
+        - name: planning_control
+          kind: container
+          shared_memory: true
+          daemon_port: 8783
+  bindings:
+    - compute_unit: map_localization
+      environment: ecu_b/map_localization
+    - compute_unit: planning_control
+      environment: ecu_b/planning_control
