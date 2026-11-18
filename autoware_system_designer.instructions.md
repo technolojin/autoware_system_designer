@@ -22,6 +22,7 @@ Follow this directory structure for consistency (not mandatory).
 - **Subsystems** (sub format): `src/<package_name>/design/subsystem/` (suffix: `.subsystem.yaml`)
 - **Deployments** (sub format): `src/<package_name>/deployment/` (suffix: `.deployments.yaml`)
 - **E/E Architectures**: `src/<package_name>/design/ee_architecture/` (suffix: `.ee_architecture.yaml`)
+- **Devices**: `src/<package_name>/design/device/` (suffix: `.device.yaml`)
 
 ## 4. Main Formats: Configuration Entities & Schemas
 
@@ -225,6 +226,10 @@ Top-level entry point defining the complete system.
   - `kind`: (Optional) Where the unit exists relative to the deployed vehicle. `onboard` (default) runs on the vehicle and gets a launcher; `offboard` is a participant outside the vehicle (infrastructure, cloud, remote operation) whose components are declared for wiring only. Offboard units get no launcher and no launch-command entry; their components remain in the structure export.
   - `description`: (Optional) Brief explanation of the unit.
   - `requires`: (Optional) Capabilities the unit needs from the execution environment it is launched in (e.g., `[gpu]`). Names are free (`^[a-z][a-z0-9_]*$`); an E/E architecture may bind the unit only to an environment whose `provides` holds every one of them.
+- `peripherals`: (Optional) Hardware outside the compute units that components talk to (sensors, actuators, vehicle controllers), by logical name. The system design names no device; an E/E architecture binds each name to one.
+  - `name`: Peripheral identifier (`^[a-z][a-z0-9_]*$`); the key an E/E architecture binds by.
+  - `component`: (Optional) Top-level component whose nodes talk to the peripheral. The interfaces and addresses the component's compute units reach the device by are derived from it.
+  - `description`: (Optional) Brief explanation of the peripheral.
 - `components`: Top-level instances.
   - `name`: Name of the component instance.
   - `entity`: Reference to module/node (e.g., `SensingModule.module`).
@@ -264,25 +269,31 @@ Overrides parameters for specific nodes within the system hierarchy.
 
 ### 4.5. E/E Architecture Configuration (`.ee_architecture.yaml`)
 
-Describes the hardware a system is deployed on and binds each compute unit to an execution environment. A system design names compute units only; an E/E architecture names devices and compute units only, never components. The same system runs on another architecture without a change to its design.
+Describes the hardware a system is deployed on: device instances with their interfaces, the connections between interfaces, the networks addressed over them, time synchronization, and the binding of each compute unit to an execution environment and of each peripheral to a device. A system design names compute units and peripherals only; an E/E architecture names devices, compute units and peripherals only, never components. The same system runs on another architecture without a change to its design. Addresses, interface names and ports of the hardware belong here, not in node parameters.
 **Fields:**
 
 - `autoware_system_design_format`: Must be a version up to the supported `DESIGN_FORMAT_VERSION`.
 - `name`: Must match filename.
 - `description`: (Optional) Brief explanation of the architecture.
-- `networks`: (Optional) Networks the devices are connected by.
+- `networks`: (Optional) Networks addressed over the wiring.
   - `name`: Network identifier (`^[a-z][a-z0-9_]*$`).
   - `subnet`: (Optional) Address range in CIDR notation (e.g., `192.168.30.0/24`); interface addresses on the network lie inside it.
+  - `vlan`: (Optional) VLAN id of the network on the interfaces it is on.
+  - `carries`: (Optional) Traffic the network is for (e.g., `[dds]`, `[daemon, ptp]`). Names are free; `daemon` selects the addresses the studio daemons answer on.
   - `description`: (Optional) Brief explanation of the network.
-- `devices`: Devices of the vehicle.
-  - `name`: Device identifier (`^[a-z][a-z0-9_]*$`).
-  - `hardware`: (Optional) Hardware class (e.g., `x86_64`, `jetson_orin`).
+- `devices`: Device instances of the vehicle: ECUs, switches, routers, sensors, actuators.
+  - `name`: Instance identifier (`^[a-z][a-z0-9_]*$`).
+  - `device`: (Optional) Device entity the instance is of (e.g., `MainEcu.device`, Section 4.6). Its interfaces, environments and parts are then configured by name here; `role` and `hardware` come from the entity. Without it, the instance is described inline.
+  - `role`: (Optional, inline only) `ecu`, `switch`, `router`, `sensor`, `actuator` or `other`. Default `ecu` with environments, else `other`. A `switch` or `router` forwards between its interfaces.
+  - `hardware`: (Optional, inline only) Hardware class (e.g., `x86_64`, `jetson_orin`).
   - `description`: (Optional) Brief explanation of the device.
-  - `interfaces`: (Optional) Network interfaces.
-    - `name`: Interface name on the device (e.g., `eth0`).
-    - `network`: Name of a declared network.
-    - `address`: (Optional) Fixed address, the same on every vehicle of the architecture.
-  - `environments`: Execution environments on the device; at least one.
+  - `interfaces`: (Optional) Interfaces of the instance.
+    - `name`: Interface name on the device (e.g., `eth0`, `can0`, `p1`); no dots.
+    - `type`: (Optional, inline only) `ethernet` (default), `can`, `lin`, `flexray`, `serial`, `gmsl`, `usb` or `other`.
+    - `bitrate`: (Optional, inline only) Capacity in bit/s, as an integer or with suffix `k`, `M`, `G` (e.g., `500k`, `10G`).
+    - `network`, `address`: (Optional) Declared network the interface is on and its fixed address there, the same on every vehicle of the architecture.
+    - `networks`: (Optional) List of `{network, address}` for an interface on several networks (VLANs, secondary addresses).
+  - `environments`: Execution environments on the device. A device without one hosts no compute unit.
     - `name`: Environment identifier (`^[a-z][a-z0-9_]*$`); referenced as `<device>/<environment>`.
     - `kind`: (Optional) `host` (default, the device's operating system), `container` or `vm`.
     - `network`: (Optional) `host` (default) shares the device's network namespace, loopback included; `own` has its own network namespace.
@@ -291,10 +302,24 @@ Describes the hardware a system is deployed on and binds each compute unit to an
     - `provides`: (Optional) Capabilities the environment gives the compute units bound to it (e.g., `[gpu]`), matched by name against each unit's `requires`. A capability belongs to the environment, not the device: a container has a GPU only when it is passed through.
     - `daemon_port`: Loopback port of the environment's studio daemon. Required, and distinct, once compute units are bound to more than one environment.
     - `description`: (Optional) Brief explanation of the environment.
+  - `parts`: (Optional, with `device`) Configuration of the parts of a composite device, each with `name` and its own `interfaces`, `environments` and `parts`. A part is referenced as `<device>.<part>`.
+- `connections`: (Optional) Physical connections between interfaces. An endpoint is `<device>.<interface>`; `<device>` alone stands for any port of a switch or router.
+  - `link`: Two endpoints joined point to point. Or:
+  - `bus`: Two or more endpoints on a shared medium (e.g., a CAN bus).
+  - `name`: (Optional) Connection identifier; the key a variant overrides and removes by.
+  - `bitrate`: (Optional) Capacity in bit/s. Default: the lowest `bitrate` of the joined interfaces.
+  - `description`: (Optional) Brief explanation of the connection.
+- `time_sync`: (Optional) Time synchronization domains.
+  - `name`: Domain identifier.
+  - `profile`: (Optional) Synchronization profile (e.g., `ptpv2`, `gptp`).
+  - `grandmaster`: `<device>.<interface>` the domain's time is sent from.
+  - `members`: (Optional) `<device>.<interface>` entries synchronized to the grandmaster. An interface is a member of one domain.
+  - `source`: (Optional) Domain the grandmaster's device takes its time from; the device has a member interface in it.
+  - `reference`: (Optional, without `source`) External time the grandmaster's device follows (e.g., `ntp`, `gnss`).
 - `main_environment`: `<device>/<environment>` whose daemon serves the compute units of the other environments. Required once compute units are bound to more than one environment.
-- `bindings`: Environment of each compute unit.
-  - `compute_unit`: Name of an `onboard` compute unit of the system.
-  - `environment`: `<device>/<environment>` the unit is launched in. Several units may share one environment. The build fails when the environment does not provide a capability the unit requires.
+- `bindings`: What the system's logical names are on this hardware. Each entry is one of:
+  - `compute_unit` + `environment`: Name of an `onboard` compute unit and the `<device>/<environment>` it is launched in. Several units may share one environment. The build fails when the environment does not provide a capability the unit requires.
+  - `peripheral` + `device`: Name of a peripheral of the system and the device instance it is.
 
 A deployments table lists the architectures its system is deployed on under `ee_architectures`. Each is checked against the system and exported with it:
 
@@ -308,12 +333,54 @@ deploy_list:
 
 **Rules:**
 
-- Every `onboard` compute unit of the system is bound exactly once; `offboard` units are not bound.
+- Every `onboard` compute unit of the system is bound exactly once; `offboard` units are not bound. Every peripheral of the system is bound exactly once.
 - Addresses are unique within the architecture.
-- An environment outside the main environment's network namespace has an address: its own, or an interface address of its device, preferring a network the main environment's device is on.
+- A connection joins interfaces of one `type`. An interface is in one connection of the architecture, and in one of the device entity it belongs to.
+- Once the architecture declares connections, a path of them joins each peripheral's device to the device of every compute unit of its component, and each time sync member to its grandmaster. A path passes through switches, routers and ports wired on inside a composite device.
+- An environment outside the main environment's network namespace has an address: its own, or an interface address of its device on a network that carries `daemon`; when no network carries it, on a network the main environment's device is on.
 - A connection between compute units in different environments of one device, where not both set `shared_memory`, warns to disable the DDS shared memory transport there.
 
-A variant (`base`) replaces `networks` and `devices` by `name` and `bindings` by `compute_unit` under `override`, sets `main_environment` there, and drops entries under `remove` (see Section 5).
+**Derived and exported with each architecture:**
+
+- One record per environment, with its compute units and the address its daemon answers on.
+- `wiring`: every device, parts included, with its interfaces, and every connection with its capacity.
+- `peripherals`: for each, its device and addresses, and per compute unit of its component the interface, network and address that reach it and the connections on the way.
+- `time_sync`: for each member, the connections from the grandmaster.
+
+A variant (`base`) replaces `networks`, `devices`, `connections` and `time_sync` by `name` and `bindings` by `compute_unit` or `peripheral` under `override`, sets `main_environment` there, and drops entries under `remove` (see Section 5).
+
+### 4.6. Device Configuration (`.device.yaml`)
+
+Describes one kind of hardware, instantiated by E/E architectures and as a part of other devices. It holds what is the same for every instance; addresses, networks and daemon ports are set on the instance.
+**Fields:**
+
+- `autoware_system_design_format`: Must be a version up to the supported `DESIGN_FORMAT_VERSION`.
+- `name`: Must match filename (e.g., `MainEcu.device`).
+- `description`: (Optional) Brief explanation of the device.
+- `role`: (Optional) `ecu`, `switch`, `router`, `sensor`, `actuator` or `other` (default).
+- `hardware`: (Optional) Hardware class.
+- `interfaces`: (Optional) Interfaces, each with `name`, `type`, `bitrate` and `description` as in Section 4.5.
+- `environments`: (Optional) Execution environments, each with `name`, `kind`, `network`, `shared_memory`, `provides` and `description`.
+- `parts`: (Optional) Devices inside this one, e.g., the SoCs of a board or an on-board switch.
+  - `name`: Part identifier.
+  - `device`: Device entity of the part.
+  - `description`: (Optional) Brief explanation of the part.
+- `connections`: (Optional) Connections inside the device, in the form of Section 4.5. An endpoint is `<interface>` of the device itself or `<part>.<interface>`. An interface connected here and by an architecture is a port wired on through the device.
+
+```yaml
+name: MainEcu.device
+role: ecu
+hardware: x86_64
+interfaces:
+  - { name: eth0, bitrate: 10G }
+  - { name: can0, type: can }
+environments:
+  - { name: host, provides: [gpu] }
+parts:
+  - { name: switch, device: SwitchIc.device }
+connections:
+  - link: [eth0, switch.p0]
+```
 
 ## 5. Base-Variant Pattern
 

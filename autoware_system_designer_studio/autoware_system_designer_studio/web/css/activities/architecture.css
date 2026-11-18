@@ -1,0 +1,225 @@
+/* E/E activity: the wiring diagram of an E/E architecture. */
+
+:root {
+  /* Connection types of the wiring diagram */
+  --wiring-ethernet: var(--text-primary);
+  --wiring-can: #b7791f;
+  --wiring-other: #6c757d;
+  /* Lit time sync domains and peripheral paths */
+  --wiring-lit-0: #0d6efd;
+  --wiring-lit-1: #8e5ea2;
+  --wiring-lit-2: #1f8a70;
+  --wiring-lit-3: #d6336c;
+  --wiring-lit-4: #b7791f;
+}
+
+[data-theme="dark"] {
+  --wiring-can: #e0a84f;
+  --wiring-other: #8d959c;
+  --wiring-lit-0: #4da3ff;
+  --wiring-lit-1: #b48ccf;
+  --wiring-lit-2: #5cc8a8;
+  --wiring-lit-3: #f783ac;
+  --wiring-lit-4: #e0a84f;
+}
+
+.wiring-scroll {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background: var(--bg-secondary);
+}
+
+.wiring-diagram {
+  display: block;
+  font-family: var(--mono-font);
+}
+
+.wiring-device {
+  fill: var(--bg-primary);
+  stroke: var(--flow-node-border);
+  stroke-width: 1.2;
+  cursor: pointer;
+}
+
+.wiring-device.row-core {
+  fill: var(--bg-sidebar);
+  stroke: var(--text-secondary);
+}
+
+.wiring-part {
+  fill: var(--bg-secondary);
+  stroke: var(--text-secondary);
+  stroke-width: 1.2;
+  cursor: pointer;
+}
+
+.wiring-part.bar {
+  fill: var(--text-secondary);
+}
+
+.wiring-rail {
+  stroke: var(--wiring-ethernet);
+  stroke-width: 6;
+  stroke-linecap: round;
+  cursor: pointer;
+}
+
+.wiring-wire {
+  stroke: var(--wiring-other);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.wiring-wire.type-ethernet {
+  stroke: var(--wiring-ethernet);
+}
+
+.wiring-wire.type-can {
+  stroke: var(--wiring-can);
+}
+
+.wiring-wire.kind-bus.run {
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.wiring-wire.kind-network {
+  stroke: var(--border-hover);
+  stroke-dasharray: 5 4;
+}
+
+.wiring-hit {
+  stroke: transparent;
+  stroke-width: 9;
+  cursor: pointer;
+}
+
+.wiring-halo {
+  stroke: var(--bg-secondary);
+  stroke-width: 7;
+}
+
+.wiring-text,
+.wiring-capacity,
+.wiring-badge {
+  font-size: 10px;
+  fill: var(--text-primary);
+  pointer-events: none;
+}
+
+.wiring-text.name {
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.wiring-text.name.core {
+  font-size: 13px;
+}
+
+.wiring-text.sub,
+.wiring-text.address {
+  fill: var(--text-muted);
+}
+
+.wiring-text.peripheral {
+  fill: var(--highlight);
+}
+
+/* Labels lying over wires keep a ground of their own. */
+.wiring-capacity,
+.wiring-layer-texts > .wiring-text.name:not(.core) {
+  paint-order: stroke;
+  stroke: var(--bg-secondary);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.wiring-capacity {
+  fill: var(--text-muted);
+  font-size: 9px;
+}
+
+.wiring-capacity.named {
+  fill: var(--text-secondary);
+  font-size: 10px;
+}
+
+.wiring-diagram.no-capacity .wiring-capacity:not(.named) {
+  display: none;
+}
+
+.wiring-diagram.dimmed .wiring-wire:not(.lit),
+.wiring-diagram.dimmed .wiring-rail:not(.marked),
+.wiring-diagram.dimmed .wiring-capacity {
+  opacity: 0.22;
+}
+
+.wiring-diagram.dimmed .wiring-device:not(.marked) {
+  stroke-opacity: 0.4;
+}
+
+.wiring-wire.lit {
+  stroke-width: 3;
+  stroke-dasharray: none;
+}
+
+.wiring-wire.lit[data-colour="0"] {
+  stroke: var(--wiring-lit-0);
+}
+.wiring-wire.lit[data-colour="1"] {
+  stroke: var(--wiring-lit-1);
+}
+.wiring-wire.lit[data-colour="2"] {
+  stroke: var(--wiring-lit-2);
+}
+.wiring-wire.lit[data-colour="3"] {
+  stroke: var(--wiring-lit-3);
+}
+.wiring-wire.lit[data-colour="4"] {
+  stroke: var(--wiring-lit-4);
+}
+
+.wiring-arrow[data-colour="0"],
+.wiring-badge[data-colour="0"] {
+  fill: var(--wiring-lit-0);
+}
+.wiring-arrow[data-colour="1"],
+.wiring-badge[data-colour="1"] {
+  fill: var(--wiring-lit-1);
+}
+.wiring-arrow[data-colour="2"],
+.wiring-badge[data-colour="2"] {
+  fill: var(--wiring-lit-2);
+}
+.wiring-arrow[data-colour="3"],
+.wiring-badge[data-colour="3"] {
+  fill: var(--wiring-lit-3);
+}
+.wiring-arrow[data-colour="4"],
+.wiring-badge[data-colour="4"] {
+  fill: var(--wiring-lit-4);
+}
+
+.wiring-badge {
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--bg-sidebar);
+  stroke-width: 3px;
+}
+
+.wiring-device.marked {
+  stroke-width: 2;
+}
+
+.wiring-device.selected,
+.wiring-part.selected {
+  stroke: var(--border-active);
+  stroke-width: 2.5;
+}
+
+.wiring-rail.selected,
+.wiring-wire.selected {
+  stroke: var(--border-active);
+  stroke-width: 3.5;
+}

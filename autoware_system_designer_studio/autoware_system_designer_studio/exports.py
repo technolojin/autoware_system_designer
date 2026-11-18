@@ -242,6 +242,15 @@ class SystemExport:
             if isinstance(unit, dict) and isinstance(unit.get("name"), str)
         ]
 
+    def ee_architectures(self) -> list[dict[str, Any]]:
+        """Resolved records of the E/E architectures the system is declared for."""
+        records = self.manifest.get("ee_architectures")
+        return [
+            record
+            for record in (records if isinstance(records, list) else [])
+            if isinstance(record, dict) and isinstance(record.get("name"), str)
+        ]
+
     def build_script_units(self, mode: str) -> list[str]:
         """Launched units of ``mode`` with a generated build script; a unit without packages has none."""
         scripts_dir = self.export_dir / BUILD_SCRIPTS_SUBDIR / mode
