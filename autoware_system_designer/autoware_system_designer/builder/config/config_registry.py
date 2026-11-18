@@ -40,6 +40,7 @@ from autoware_system_designer.model.config import (
     Config,
     ConfigSubType,
     ConfigType,
+    DeviceConfig,
     EeArchitectureConfig,
     ModuleConfig,
     NodeConfig,
@@ -466,6 +467,10 @@ class ConfigRegistry:
             self.get_ee_architecture,
         )
 
+    def get_device(self, name: str) -> DeviceConfig:
+        """Get a device entity by name."""
+        return self._get_entity_with_base(name, ConfigType.DEVICE, ValidationError)
+
     def get_entity_by_type(self, name: str, entity_type: str) -> Config:
         """Get an entity by name and type."""
         if entity_type == ConfigType.NODE:
@@ -478,6 +483,8 @@ class ConfigRegistry:
             return self.get_system(name)
         elif entity_type == ConfigType.EE_ARCHITECTURE:
             return self.get_ee_architecture(name)
+        elif entity_type == ConfigType.DEVICE:
+            return self.get_device(name)
         else:
             raise ValidationError(f"Unknown entity type: {entity_type}")
 

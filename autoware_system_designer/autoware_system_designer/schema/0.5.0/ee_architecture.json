@@ -3,7 +3,549 @@
   "title": "E/E Architecture Entity Schema 0.5.0",
   "description": "Schema for autoware_system_design_format E/E architecture entities",
   "type": "object",
-  "required": ["name"],
+  "required": [
+    "name"
+  ],
+  "definitions": {
+    "network": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "subnet": {
+          "type": "string",
+          "description": "Address range of the network in CIDR notation (e.g. 192.168.30.0/24)"
+        },
+        "vlan": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4094,
+          "description": "VLAN id of the network on the interfaces it is on"
+        },
+        "carries": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "description": "Traffic the network is for (e.g. dds, daemon, ptp, sensor); daemon selects the addresses the studio daemons answer on"
+        }
+      }
+    },
+    "device": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "device": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+\\.device$",
+          "description": "Device entity this instance is of; its interfaces and environments are configured by name here"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "ecu",
+            "switch",
+            "router",
+            "sensor",
+            "actuator",
+            "other"
+          ],
+          "description": "ecu: hosts compute units; switch, router: forwards between its interfaces; sensor, actuator: peripheral hardware"
+        },
+        "hardware": {
+          "type": "string",
+          "description": "Hardware class of the device (e.g. x86_64, jetson_orin)"
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Interface name on the device (e.g. eth0, mgbe1, can0, p1)"
+              },
+              "description": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "ethernet",
+                  "can",
+                  "lin",
+                  "flexray",
+                  "serial",
+                  "gmsl",
+                  "usb",
+                  "other"
+                ],
+                "description": "Medium of the interface; a connection joins interfaces of one type"
+              },
+              "bitrate": {
+                "description": "Capacity in bit/s: an integer, or a number with suffix k, M or G (e.g. 500k, 10G)",
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[0-9]+(\\.[0-9]+)?[kMG]?$"
+                  }
+                ]
+              },
+              "network": {
+                "type": "string",
+                "description": "Name of a declared network"
+              },
+              "address": {
+                "type": "string",
+                "description": "Fixed address of the interface on the network, the same on every vehicle"
+              },
+              "networks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "network"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "network": {
+                      "type": "string",
+                      "description": "Name of a declared network"
+                    },
+                    "address": {
+                      "type": "string",
+                      "description": "Fixed address of the interface on the network, the same on every vehicle"
+                    }
+                  }
+                },
+                "description": "Networks the interface is on, when more than one (VLANs, secondary addresses)"
+              }
+            }
+          }
+        },
+        "environments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "description": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "host",
+                  "container",
+                  "vm"
+                ],
+                "description": "host: the device's operating system; container, vm: an isolated environment on it"
+              },
+              "network": {
+                "type": "string",
+                "enum": [
+                  "host",
+                  "own"
+                ],
+                "description": "host (default): shares the device's network namespace, loopback included; own: has its own network namespace and address"
+              },
+              "shared_memory": {
+                "type": "boolean",
+                "description": "Shares the device's shared memory with the other environments of the device that set it (default false)"
+              },
+              "provides": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "description": "Capabilities the environment provides to the compute units bound to it (e.g. gpu)"
+              },
+              "address": {
+                "type": "string",
+                "description": "Fixed address of an environment with its own network"
+              },
+              "daemon_port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "description": "Loopback port of the environment's studio daemon"
+              }
+            }
+          }
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/part"
+          },
+          "description": "Configuration of the parts of a composite device, by part name"
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "link": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[A-Za-z0-9_-]+)*$",
+            "description": "<device>.<interface>; <device> alone for any port of a switch or router"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Point-to-point connection of two interfaces"
+        },
+        "bus": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[A-Za-z0-9_-]+)*$",
+            "description": "<device>.<interface>; <device> alone for any port of a switch or router"
+          },
+          "minItems": 2,
+          "uniqueItems": true,
+          "description": "Shared medium joining several interfaces (e.g. a CAN bus)"
+        },
+        "bitrate": {
+          "description": "Capacity in bit/s: an integer, or a number with suffix k, M or G (e.g. 500k, 10G)",
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9]+(\\.[0-9]+)?[kMG]?$"
+            }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "link"
+          ]
+        },
+        {
+          "required": [
+            "bus"
+          ]
+        }
+      ]
+    },
+    "time_sync": {
+      "type": "object",
+      "required": [
+        "name",
+        "grandmaster"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string",
+          "description": "Synchronization profile (e.g. ptpv2, gptp)"
+        },
+        "grandmaster": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[A-Za-z0-9_-]+)*$",
+          "description": "<device>.<interface> the domain's time is sent from"
+        },
+        "source": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Domain the grandmaster's device takes its time from, as a member of it"
+        },
+        "reference": {
+          "type": "string",
+          "description": "External time the grandmaster's device follows when the domain has no source (e.g. ntp, gnss)"
+        },
+        "members": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[A-Za-z0-9_-]+)*$",
+            "description": "<device>.<interface> synchronized to the grandmaster"
+          }
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "compute_unit": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "environment": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*/[a-z][a-z0-9_]*$",
+          "description": "<device>/<environment>"
+        },
+        "peripheral": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "device": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[A-Za-z0-9_-]+)*$",
+          "description": "Device instance the peripheral is"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "compute_unit",
+            "environment"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "peripheral"
+                ]
+              },
+              {
+                "required": [
+                  "device"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "peripheral",
+            "device"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "compute_unit"
+                ]
+              },
+              {
+                "required": [
+                  "environment"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "part": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Interface name on the device (e.g. eth0, mgbe1, can0, p1)"
+              },
+              "description": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "ethernet",
+                  "can",
+                  "lin",
+                  "flexray",
+                  "serial",
+                  "gmsl",
+                  "usb",
+                  "other"
+                ],
+                "description": "Medium of the interface; a connection joins interfaces of one type"
+              },
+              "bitrate": {
+                "description": "Capacity in bit/s: an integer, or a number with suffix k, M or G (e.g. 500k, 10G)",
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[0-9]+(\\.[0-9]+)?[kMG]?$"
+                  }
+                ]
+              },
+              "network": {
+                "type": "string",
+                "description": "Name of a declared network"
+              },
+              "address": {
+                "type": "string",
+                "description": "Fixed address of the interface on the network, the same on every vehicle"
+              },
+              "networks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "network"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "network": {
+                      "type": "string",
+                      "description": "Name of a declared network"
+                    },
+                    "address": {
+                      "type": "string",
+                      "description": "Fixed address of the interface on the network, the same on every vehicle"
+                    }
+                  }
+                },
+                "description": "Networks the interface is on, when more than one (VLANs, secondary addresses)"
+              }
+            }
+          }
+        },
+        "environments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "description": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "host",
+                  "container",
+                  "vm"
+                ],
+                "description": "host: the device's operating system; container, vm: an isolated environment on it"
+              },
+              "network": {
+                "type": "string",
+                "enum": [
+                  "host",
+                  "own"
+                ],
+                "description": "host (default): shares the device's network namespace, loopback included; own: has its own network namespace and address"
+              },
+              "shared_memory": {
+                "type": "boolean",
+                "description": "Shares the device's shared memory with the other environments of the device that set it (default false)"
+              },
+              "provides": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "description": "Capabilities the environment provides to the compute units bound to it (e.g. gpu)"
+              },
+              "address": {
+                "type": "string",
+                "description": "Fixed address of an environment with its own network"
+              },
+              "daemon_port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "description": "Loopback port of the environment's studio daemon"
+              }
+            }
+          }
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/part"
+          }
+        }
+      }
+    }
+  },
   "properties": {
     "autoware_system_design_format": {
       "type": "string"
@@ -25,140 +567,36 @@
         "networks": {
           "type": "array",
           "items": {
-            "type": "object",
-            "required": ["name"],
-            "additionalProperties": false,
-            "properties": {
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9_]*$"
-              },
-              "description": {
-                "type": "string"
-              },
-              "subnet": {
-                "type": "string",
-                "description": "Address range of the network in CIDR notation (e.g. 192.168.30.0/24)"
-              }
-            }
+            "$ref": "#/definitions/network"
           }
         },
         "devices": {
           "type": "array",
           "items": {
-            "type": "object",
-            "required": ["name", "environments"],
-            "additionalProperties": false,
-            "properties": {
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9_]*$"
-              },
-              "description": {
-                "type": "string"
-              },
-              "hardware": {
-                "type": "string",
-                "description": "Hardware class of the device (e.g. x86_64, jetson_orin)"
-              },
-              "interfaces": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": ["name", "network"],
-                  "additionalProperties": false,
-                  "properties": {
-                    "name": {
-                      "type": "string",
-                      "description": "Interface name on the device (e.g. eth0, mgbe1)"
-                    },
-                    "network": {
-                      "type": "string",
-                      "description": "Name of a declared network"
-                    },
-                    "address": {
-                      "type": "string",
-                      "description": "Fixed address of the interface, the same on every vehicle"
-                    }
-                  }
-                }
-              },
-              "environments": {
-                "type": "array",
-                "minItems": 1,
-                "items": {
-                  "type": "object",
-                  "required": ["name"],
-                  "additionalProperties": false,
-                  "properties": {
-                    "name": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "enum": ["host", "container", "vm"],
-                      "description": "host: the device's operating system; container, vm: an isolated environment on it"
-                    },
-                    "network": {
-                      "type": "string",
-                      "enum": ["host", "own"],
-                      "description": "host (default): shares the device's network namespace, loopback included; own: has its own network namespace and address"
-                    },
-                    "address": {
-                      "type": "string",
-                      "description": "Fixed address of an environment with its own network"
-                    },
-                    "shared_memory": {
-                      "type": "boolean",
-                      "description": "Shares the device's shared memory with the other environments of the device that set it (default false)"
-                    },
-                    "provides": {
-                      "type": "array",
-                      "uniqueItems": true,
-                      "items": {
-                        "type": "string",
-                        "pattern": "^[a-z][a-z0-9_]*$"
-                      },
-                      "description": "Capabilities the environment provides to the compute units bound to it (e.g. gpu)"
-                    },
-                    "daemon_port": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 65535,
-                      "description": "Loopback port of the environment's studio daemon"
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/definitions/device"
+          }
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/connection"
+          }
+        },
+        "time_sync": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/time_sync"
           }
         },
         "bindings": {
           "type": "array",
           "items": {
-            "type": "object",
-            "required": ["compute_unit", "environment"],
-            "additionalProperties": false,
-            "properties": {
-              "compute_unit": {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9_]*$"
-              },
-              "environment": {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9_]*/[a-z][a-z0-9_]*$",
-                "description": "<device>/<environment>"
-              }
-            }
+            "$ref": "#/definitions/binding"
           }
         },
         "main_environment": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_]*/[a-z][a-z0-9_]*$",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*/[a-z][a-z0-9_]*$",
           "description": "<device>/<environment> whose daemon serves the units of the other environments"
         }
       }
@@ -171,21 +609,54 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["name"]
+            "required": [
+              "name"
+            ]
           }
         },
         "devices": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["name"]
+            "required": [
+              "name"
+            ]
+          }
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ]
+          }
+        },
+        "time_sync": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ]
           }
         },
         "bindings": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["compute_unit"]
+            "oneOf": [
+              {
+                "required": [
+                  "compute_unit"
+                ]
+              },
+              {
+                "required": [
+                  "peripheral"
+                ]
+              }
+            ]
           }
         }
       }
@@ -193,150 +664,51 @@
     "networks": {
       "type": "array",
       "items": {
-        "type": "object",
-        "required": ["name"],
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9_]*$"
-          },
-          "description": {
-            "type": "string"
-          },
-          "subnet": {
-            "type": "string",
-            "description": "Address range of the network in CIDR notation (e.g. 192.168.30.0/24)"
-          }
-        }
+        "$ref": "#/definitions/network"
       }
     },
     "devices": {
       "type": "array",
       "items": {
-        "type": "object",
-        "required": ["name", "environments"],
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9_]*$"
-          },
-          "description": {
-            "type": "string"
-          },
-          "hardware": {
-            "type": "string",
-            "description": "Hardware class of the device (e.g. x86_64, jetson_orin)"
-          },
-          "interfaces": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": ["name", "network"],
-              "additionalProperties": false,
-              "properties": {
-                "name": {
-                  "type": "string",
-                  "description": "Interface name on the device (e.g. eth0, mgbe1)"
-                },
-                "network": {
-                  "type": "string",
-                  "description": "Name of a declared network"
-                },
-                "address": {
-                  "type": "string",
-                  "description": "Fixed address of the interface, the same on every vehicle"
-                }
-              }
-            }
-          },
-          "environments": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "type": "object",
-              "required": ["name"],
-              "additionalProperties": false,
-              "properties": {
-                "name": {
-                  "type": "string",
-                  "pattern": "^[a-z][a-z0-9_]*$"
-                },
-                "description": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string",
-                  "enum": ["host", "container", "vm"],
-                  "description": "host: the device's operating system; container, vm: an isolated environment on it"
-                },
-                "network": {
-                  "type": "string",
-                  "enum": ["host", "own"],
-                  "description": "host (default): shares the device's network namespace, loopback included; own: has its own network namespace and address"
-                },
-                "address": {
-                  "type": "string",
-                  "description": "Fixed address of an environment with its own network"
-                },
-                "shared_memory": {
-                  "type": "boolean",
-                  "description": "Shares the device's shared memory with the other environments of the device that set it (default false)"
-                },
-                "provides": {
-                  "type": "array",
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string",
-                    "pattern": "^[a-z][a-z0-9_]*$"
-                  },
-                  "description": "Capabilities the environment provides to the compute units bound to it (e.g. gpu)"
-                },
-                "daemon_port": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 65535,
-                  "description": "Loopback port of the environment's studio daemon"
-                }
-              }
-            }
-          }
-        }
+        "$ref": "#/definitions/device"
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/connection"
+      }
+    },
+    "time_sync": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/time_sync"
       }
     },
     "bindings": {
       "type": "array",
       "items": {
-        "type": "object",
-        "required": ["compute_unit", "environment"],
-        "additionalProperties": false,
-        "properties": {
-          "compute_unit": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9_]*$"
-          },
-          "environment": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9_]*/[a-z][a-z0-9_]*$",
-            "description": "<device>/<environment>"
-          }
-        }
+        "$ref": "#/definitions/binding"
       }
     },
     "main_environment": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]*/[a-z][a-z0-9_]*$",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*/[a-z][a-z0-9_]*$",
       "description": "<device>/<environment> whose daemon serves the units of the other environments"
     }
   },
   "additionalProperties": false,
   "if": {
     "not": {
-      "required": ["base"]
+      "required": [
+        "base"
+      ]
     }
   },
   "then": {
-    "required": ["devices", "bindings"]
+    "required": [
+      "devices",
+      "bindings"
+    ]
   }
 }

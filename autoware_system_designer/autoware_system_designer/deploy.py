@@ -268,7 +268,10 @@ class DeploymentBuilder:
                 f"E/E architecture(s) {duplicates} are listed more than once in the deployments table"
             )
         artifacts.ee_architectures = [
-            resolve_ee_architecture(self.config_registry.get_ee_architecture(name), system_config) for name in names
+            resolve_ee_architecture(
+                self.config_registry.get_ee_architecture(name), system_config, self.config_registry.get_device
+            )
+            for name in names
         ]
 
     def _export_workspace_root(self) -> Optional[str]:

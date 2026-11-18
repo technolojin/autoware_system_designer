@@ -75,7 +75,7 @@ def system_dir(export: SystemExport) -> str:
 
 
 # Workbench activities a link may open; the page falls back to Explore for one it does not offer.
-LINKED_ACTIVITIES = ("explore", "launch", "replay", "build")
+LINKED_ACTIVITIES = ("explore", "architecture", "launch", "replay", "build")
 
 
 def system_pages(export: SystemExport) -> dict[str, str]:
@@ -214,6 +214,7 @@ class Site:
             editor_scheme=EDITOR_SCHEME,
             system_definition_file=export.system_file,
             compute_units=export.compute_units(),
+            ee_architectures=export.ee_architectures(),
             process_topics=sorted(special.process),
             ambient_topics=list(special.ambient_inputs),
             companion_topics={topic: list(companions) for topic, companions in special.companions.items()},

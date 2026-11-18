@@ -51,7 +51,7 @@ stylesheet per area; `pages/assets.py` declares the load order of each page.
 | Path                               | Role                                                                                   |
 | ---------------------------------- | -------------------------------------------------------------------------------------- |
 | `js/core/`                         | `SD` namespace, page events, theme, editor links, selection store, daemon client       |
-| `js/diagrams/`                     | `DiagramBase`, the three diagram modules (registered on `SD.diagrams`)                 |
+| `js/diagrams/`                     | `DiagramBase`, the three diagram modules (registered on `SD.diagrams`), `SD.wiring`    |
 | `js/inspector/`                    | info panel of the selected element                                                     |
 | `js/shell/`                        | workbench frame: activity registry and rail, system menu, panel layout, status bar     |
 | `js/widgets/`                      | building blocks activities share: controls, main view, terminal, namespace tree, marks |
@@ -71,9 +71,22 @@ the systems of the site by package, each with its icon.
 | Activity | Rail items                                        | Side panel                                     | Main area                                            |
 | -------- | ------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------- |
 | Explore  | Diagrams: Nodes, Logic, Sequence (`?diagram=`)    | entity search                                  | diagram canvas; inspector shows the selected element |
+| E/E      | E/E                                               | architecture, lit view, environments           | wiring diagram; inspector shows the selected element |
 | Launch   | Launch: Control; Monitor: Logs, Topics (`?view=`) | none                                           | the view of the mode                                 |
 | Replay   | Replay                                            | scope tree (`?scope=`)                         | boundary, bag match, configuration, run (daemon)     |
 | Build    | Build                                             | target, compute unit, start; job list (daemon) | log of the selected job (`?job=`)                    |
+
+The E/E activity draws an E/E architecture the system is declared for (`?architecture=`) from the
+record in the system's `deployment.json`, laid out from the record alone. Devices hosting an
+environment form the middle row, each with the interfaces its connections leave by; a device made
+of parts shows them inside. A switch or router joining several of them is a rail above the row,
+with the devices reached only through it over the rails. Buses and links between the hosting
+devices run under the row, and every other device hangs below the device it is wired to. Each
+connection carries its capacity, a dash where the description gives none. `?wiring=sync` lights
+the paths of the time sync domains from each grandmaster to its members (`?domain=` for one),
+`?wiring=peripherals` the paths from each peripheral to the hosts of its nodes (`?peripheral=`).
+Compute units are listed per environment in the side panel and in the inspector of a device. An
+architecture without connections is drawn with its devices joined by their networks.
 
 The launch bar is the Launch activity's part of the top bar, shown on every activity: its drawer
 toggle, with a daemon launch of every unit of the shown mode and deploy and shutdown of every

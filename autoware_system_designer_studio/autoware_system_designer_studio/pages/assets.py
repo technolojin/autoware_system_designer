@@ -100,6 +100,15 @@ ACTIVITIES = {
         ),
         "styles": ("css/activities/explore.css",),
     },
+    "architecture": {
+        "scripts": (
+            "js/diagrams/wiring_model.js",
+            "js/diagrams/wiring_layout.js",
+            "js/diagrams/wiring_diagram.js",
+            "js/activities/architecture/index.js",
+        ),
+        "styles": ("css/activities/architecture.css",),
+    },
     "launch": {
         "scripts": (
             "js/activities/launch/sessions.js",

@@ -178,6 +178,15 @@ class SystemExport:
             ]
         return [{"name": name, "kind": KIND_ONBOARD, "description": ""} for name in self._launcher_units()]
 
+    def ee_architectures(self) -> list[dict[str, Any]]:
+        """Resolved records of the E/E architectures the system is declared for."""
+        records = self.manifest.get("ee_architectures")
+        return [
+            record
+            for record in (records if isinstance(records, list) else [])
+            if isinstance(record, dict) and isinstance(record.get("name"), str)
+        ]
+
     def _launcher_units(self) -> list[str]:
         launcher_root = self.export_dir / LAUNCHER_SUBDIR
         mode_dirs: list[Path] = [launcher_root / mode for mode in self.mode_keys()]

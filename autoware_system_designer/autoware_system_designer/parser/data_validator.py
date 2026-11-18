@@ -158,6 +158,12 @@ class EeArchitectureValidator(BaseValidator):
     ENTITY_TYPE = ConfigType.EE_ARCHITECTURE
 
 
+class DeviceValidator(BaseValidator):
+    """Validator for device entities."""
+
+    ENTITY_TYPE = ConfigType.DEVICE
+
+
 class ValidatorFactory:
     """Factory for creating validators."""
 
@@ -167,6 +173,7 @@ class ValidatorFactory:
         ConfigType.PARAMETER_SET: ParameterSetValidator,
         ConfigType.SYSTEM: SystemValidator,
         ConfigType.EE_ARCHITECTURE: EeArchitectureValidator,
+        ConfigType.DEVICE: DeviceValidator,
     }
 
     @classmethod

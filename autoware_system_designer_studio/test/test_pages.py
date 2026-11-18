@@ -320,3 +320,13 @@ def test_pack_selects_systems_by_name(tmp_path):
     assert f"{SITE}/index.html" in written
     with pytest.raises(PackError):
         pack(install, tmp_path / "out2", systems=["Missing"])
+
+
+def test_config_carries_the_e_e_architectures_of_the_system(tmp_path):
+    _, system = _system(tmp_path)
+    text = Site([system]).render(f"{SITE}/config.js")
+    assert "eeArchitectures: []" in text
+    record = {"name": "Bridge", "wiring": {"devices": [{"id": "ecu_a"}], "connections": []}}
+    system.manifest["ee_architectures"] = [record, "not a record", {"description": "nameless"}]
+    text = Site([system]).render(f"{SITE}/config.js")
+    assert json.loads(text.partition("eeArchitectures: ")[2].partition(",\n")[0]) == [record]

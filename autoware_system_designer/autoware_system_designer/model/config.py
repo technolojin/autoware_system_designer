@@ -131,6 +131,9 @@ class ParameterSetItemDict(TypedDict, total=False):
     param_values: List[Dict[str, Any]]
 
 
+DEVICE_ROLES = ("ecu", "switch", "router", "sensor", "actuator", "other")
+
+
 class ConfigType:
     """Constants for entity types."""
 
@@ -139,11 +142,12 @@ class ConfigType:
     PARAMETER_SET = "parameter_set"
     SYSTEM = "system"
     EE_ARCHITECTURE = "ee_architecture"
+    DEVICE = "device"
 
     @classmethod
     def get_all_types(cls) -> List[str]:
         """Get all valid entity types."""
-        return [cls.NODE, cls.MODULE, cls.PARAMETER_SET, cls.SYSTEM, cls.EE_ARCHITECTURE]
+        return [cls.NODE, cls.MODULE, cls.PARAMETER_SET, cls.SYSTEM, cls.EE_ARCHITECTURE, cls.DEVICE]
 
 
 class ConfigSubType:
@@ -222,6 +226,7 @@ class SystemConfig(Config):
     mode_configs: Optional[Dict[str, Dict[str, Any]]] = None  # Mode-specific overrides/removals
     parameter_sets: Optional[List[str]] = None  # System-level parameter sets
     compute_units: Optional[List[ComputeUnit]] = None  # Declared units; None when the system declares none
+    peripherals: Optional[List[Dict[str, Any]]] = None  # Hardware a component talks to, by logical name
     components: Optional[List[ComponentDict]] = None
     connections: Optional[List[Any]] = None
     variables: Optional[List[VariableDict]] = None
@@ -235,12 +240,33 @@ class EeArchitectureConfig(Config):
     """Data structure for E/E architecture entities.
 
     The physical side of a deployment: networks, devices with their execution
-    environments, and the binding of each compute unit to one environment. It
-    names compute units only, never components.
+    environments, the connections between device interfaces, time
+    synchronization, and the binding of each compute unit to one environment
+    and of each peripheral to one device. It names compute units and
+    peripherals only, never components.
     """
 
     base: Optional[str] = None  # Parent entity name for variants
     networks: Optional[List[Dict[str, Any]]] = None
     devices: Optional[List[Dict[str, Any]]] = None
+    connections: Optional[List[Dict[str, Any]]] = None
+    time_sync: Optional[List[Dict[str, Any]]] = None
     bindings: Optional[List[Dict[str, Any]]] = None
     main_environment: Optional[str] = None
+
+
+@dataclass
+class DeviceConfig(Config):
+    """Data structure for device entities.
+
+    One kind of hardware: its interfaces, the execution environments it
+    offers, and for a composite device its parts and the connections between
+    them. An E/E architecture instantiates it by name.
+    """
+
+    role: str = "other"  # one of DEVICE_ROLES
+    hardware: Optional[str] = None
+    interfaces: Optional[List[Dict[str, Any]]] = None
+    environments: Optional[List[Dict[str, Any]]] = None
+    parts: Optional[List[Dict[str, Any]]] = None
+    connections: Optional[List[Dict[str, Any]]] = None

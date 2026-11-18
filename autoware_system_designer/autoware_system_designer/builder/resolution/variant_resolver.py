@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from autoware_system_designer.builder.resolution.connection_resolver import filter_connections_by_removed_entities
 from autoware_system_designer.model.config import (
@@ -202,6 +202,7 @@ class SystemVariantResolver(VariantResolver):
             {"field": "modes", "key_field": "name"},
             {"field": "parameter_sets", "key_field": None},  # Parameter sets are appended
             {"field": "compute_units", "key_field": "name", "converter": ComputeUnit.from_dict},
+            {"field": "peripherals", "key_field": "name"},
             {"field": "components", "key_field": "name"},
             {"field": "connections", "key_field": None},
             {"field": "node_groups", "key_field": "name"},
@@ -241,6 +242,7 @@ class SystemVariantResolver(VariantResolver):
             {"field": "modes", "key_field": "name"},
             {"field": "parameter_sets", "key_field": None},  # Remove parameter sets by value
             {"field": "compute_units", "key_field": "name"},
+            {"field": "peripherals", "key_field": "name"},
             {"field": "components", "key_field": "name"},
             {"field": "variables", "key_field": "name"},
             {"field": "connections", "key_field": None},
@@ -256,8 +258,28 @@ class EeArchitectureVariantResolver(VariantResolver):
     _SPECS = [
         {"field": "networks", "key_field": "name"},
         {"field": "devices", "key_field": "name"},
-        {"field": "bindings", "key_field": "compute_unit"},
+        {"field": "connections", "key_field": "name"},
+        {"field": "time_sync", "key_field": "name"},
     ]
+
+    @staticmethod
+    def _binding_key(binding: Dict[str, Any]) -> Tuple[str, Any]:
+        """Bound name of a binding: its compute unit or its peripheral."""
+        kind = "peripheral" if "peripheral" in binding else "compute_unit"
+        return kind, binding.get(kind)
+
+    def _resolve_bindings(self, architecture: EeArchitectureConfig, config_yaml: Dict[str, Any]) -> None:
+        removed = {self._binding_key(spec) for spec in (config_yaml.get("remove") or {}).get("bindings") or []}
+        bindings = [dict(b) for b in architecture.bindings or [] if self._binding_key(b) not in removed]
+        index = {self._binding_key(binding): i for i, binding in enumerate(bindings)}
+        for binding in (config_yaml.get("override") or {}).get("bindings") or []:
+            key = self._binding_key(binding)
+            if key in index:
+                bindings[index[key]] = binding
+            else:
+                index[key] = len(bindings)
+                bindings.append(binding)
+        architecture.bindings = bindings
 
     def resolve(self, architecture: EeArchitectureConfig, config_yaml: Dict[str, Any]):
         """
@@ -268,6 +290,7 @@ class EeArchitectureVariantResolver(VariantResolver):
         if remove_config:
             self._resolve_removals(architecture, remove_config, self._SPECS)
         self._resolve_merges(architecture, config_yaml, self._SPECS)
+        self._resolve_bindings(architecture, config_yaml)
         main_environment = (config_yaml.get("override") or {}).get("main_environment")
         if main_environment:
             architecture.main_environment = main_environment

@@ -24,6 +24,7 @@ from autoware_system_designer.model.config import (
     Config,
     ConfigSubType,
     ConfigType,
+    DeviceConfig,
     EeArchitectureConfig,
     ModuleConfig,
     NodeConfig,
@@ -330,6 +331,7 @@ class ConfigParser:
                 compute_units=(
                     [ComputeUnit.from_dict(u) for u in raw_compute_units] if raw_compute_units is not None else None
                 ),
+                peripherals=config.get("peripherals"),
                 components=config.get("components"),
                 connections=config.get("connections"),
                 variables=config.get("variables"),
@@ -344,8 +346,20 @@ class ConfigParser:
                 sub_type=ConfigSubType.VARIANT if base_name else ConfigSubType.BASE,
                 networks=config.get("networks"),
                 devices=config.get("devices"),
+                connections=config.get("connections"),
+                time_sync=config.get("time_sync"),
                 bindings=config.get("bindings"),
                 main_environment=config.get("main_environment"),
+            )
+        elif entity_type == ConfigType.DEVICE:
+            return DeviceConfig(
+                **base_data,
+                role=config.get("role", "other"),
+                hardware=config.get("hardware"),
+                interfaces=config.get("interfaces"),
+                environments=config.get("environments"),
+                parts=config.get("parts"),
+                connections=config.get("connections"),
             )
         else:
             raise ValidationError(f"Unknown entity type: {entity_type}")

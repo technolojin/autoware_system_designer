@@ -104,6 +104,28 @@
         "type": "string"
       }
     },
+    "peripherals": {
+      "type": "array",
+      "description": "Hardware outside the compute units that components talk to (sensors, actuators, vehicle controllers), by logical name; an E/E architecture binds each name to a device",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "description": {
+            "type": "string"
+          },
+          "component": {
+            "type": "string",
+            "description": "Top-level component whose nodes talk to the peripheral"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "compute_units": {
       "type": "array",
       "items": {

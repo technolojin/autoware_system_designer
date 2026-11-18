@@ -1,0 +1,2866 @@
+{
+  "name": "MultiEcu",
+  "description": "ECUs, switches, LiDARs, radars and vehicle CAN buses, with the time synchronization of the ECUs and sensors.",
+  "main_environment": "main/host",
+  "networks": [
+    {
+      "name": "dds",
+      "subnet": "192.168.30.0/24",
+      "carries": ["dds", "daemon"],
+      "description": "10GbE switch carrying DDS between the ECUs."
+    },
+    {
+      "name": "hmi",
+      "subnet": "192.168.20.0/24",
+      "carries": ["ptp"],
+      "description": "1GbE switch carrying HMI traffic and the time synchronization of the ECUs."
+    },
+    {
+      "name": "lidar",
+      "subnet": "192.168.1.0/24",
+      "carries": ["sensor"],
+      "description": "LiDAR data on the switch ICs of the Autoware ECUs."
+    },
+    {
+      "name": "radar",
+      "subnet": "10.13.1.0/24",
+      "carries": ["sensor"],
+      "description": "Radar data on the switch ICs of the Autoware ECUs."
+    },
+    {
+      "name": "addon",
+      "subnet": "192.168.90.0/24",
+      "description": "Direct link between the second perception ECU and the add-on ECU."
+    }
+  ],
+  "devices": [
+    {
+      "name": "main",
+      "device": "AutowareEcu.device",
+      "description": "Main ECU.",
+      "interfaces": [
+        {
+          "name": "enp5s0f0np0",
+          "network": "hmi",
+          "address": "192.168.20.11"
+        },
+        {
+          "name": "enp5s0f1np1",
+          "network": "dds",
+          "address": "192.168.30.11"
+        },
+        {
+          "name": "enp4s0",
+          "networks": [
+            {
+              "network": "lidar",
+              "address": "192.168.1.11"
+            },
+            {
+              "network": "radar",
+              "address": "10.13.1.166"
+            }
+          ]
+        }
+      ],
+      "environments": [
+        {
+          "name": "host",
+          "daemon_port": 8781
+        }
+      ]
+    },
+    {
+      "name": "sub",
+      "device": "AutowareEcu.device",
+      "description": "Sub ECU.",
+      "interfaces": [
+        {
+          "name": "enp5s0f0np0",
+          "network": "hmi",
+          "address": "192.168.20.21"
+        },
+        {
+          "name": "enp5s0f1np1",
+          "network": "dds",
+          "address": "192.168.30.21"
+        },
+        {
+          "name": "enp4s0",
+          "networks": [
+            {
+              "network": "lidar",
+              "address": "192.168.1.21"
+            },
+            {
+              "network": "radar",
+              "address": "10.13.1.176"
+            }
+          ]
+        }
+      ],
+      "environments": [
+        {
+          "name": "host",
+          "daemon_port": 8784
+        }
+      ]
+    },
+    {
+      "name": "perception1",
+      "device": "PerceptionEcu.device",
+      "description": "Perception ECU of the camera group.",
+      "interfaces": [
+        {
+          "name": "mgbe1",
+          "network": "dds",
+          "address": "192.168.30.31"
+        },
+        {
+          "name": "enP1p1s0",
+          "network": "hmi",
+          "address": "192.168.20.31"
+        }
+      ],
+      "environments": [
+        {
+          "name": "host",
+          "daemon_port": 8782
+        }
+      ]
+    },
+    {
+      "name": "perception2",
+      "device": "PerceptionEcu.device",
+      "description": "Perception ECU of the add-on cameras.",
+      "interfaces": [
+        {
+          "name": "mgbe1",
+          "network": "dds",
+          "address": "192.168.30.32"
+        },
+        {
+          "name": "enP1p1s0",
+          "network": "hmi",
+          "address": "192.168.20.32"
+        },
+        {
+          "name": "mgbe0",
+          "network": "addon",
+          "address": "192.168.90.32"
+        }
+      ],
+      "environments": [
+        {
+          "name": "host",
+          "daemon_port": 8783
+        }
+      ]
+    },
+    {
+      "name": "addon",
+      "hardware": "x86_64",
+      "description": "Add-on ECU.",
+      "interfaces": [
+        {
+          "name": "enp7s0",
+          "bitrate": "10G",
+          "network": "dds",
+          "address": "192.168.30.33"
+        },
+        {
+          "name": "enp3s0f1",
+          "bitrate": "10G",
+          "network": "addon",
+          "address": "192.168.90.33"
+        },
+        {
+          "name": "enp0s31f6",
+          "bitrate": "1G",
+          "network": "hmi",
+          "address": "192.168.20.33"
+        }
+      ],
+      "environments": [
+        {
+          "name": "host"
+        }
+      ]
+    },
+    {
+      "name": "logging",
+      "hardware": "x86_64",
+      "description": "Logging ECU.",
+      "interfaces": [
+        {
+          "name": "enp3s0f0np0",
+          "bitrate": "10G",
+          "network": "dds",
+          "address": "192.168.30.71"
+        },
+        {
+          "name": "enp8s0",
+          "bitrate": "1G",
+          "network": "hmi",
+          "address": "192.168.20.71"
+        }
+      ],
+      "environments": [
+        {
+          "name": "host"
+        }
+      ]
+    },
+    {
+      "name": "hub_10g",
+      "role": "switch",
+      "description": "10GbE switch between the ECUs."
+    },
+    {
+      "name": "hub_1g",
+      "role": "switch",
+      "description": "1GbE switch of the HMI devices and the ECUs."
+    },
+    {
+      "name": "lidar_rear_upper",
+      "device": "Pandar128E4X.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "lidar",
+          "address": "192.168.1.202"
+        }
+      ]
+    },
+    {
+      "name": "lidar_left_upper",
+      "device": "Pandar128E4X.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "lidar",
+          "address": "192.168.1.203"
+        }
+      ]
+    },
+    {
+      "name": "lidar_rear_lower",
+      "device": "PandarQT128.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "lidar",
+          "address": "192.168.1.212"
+        }
+      ]
+    },
+    {
+      "name": "lidar_left_lower",
+      "device": "PandarQT128.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "lidar",
+          "address": "192.168.1.213"
+        }
+      ]
+    },
+    {
+      "name": "lidar_front_upper",
+      "device": "Pandar128E4X.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "lidar",
+          "address": "192.168.1.204"
+        }
+      ]
+    },
+    {
+      "name": "lidar_right_upper",
+      "device": "Pandar128E4X.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "lidar",
+          "address": "192.168.1.205"
+        }
+      ]
+    },
+    {
+      "name": "lidar_front_lower",
+      "device": "PandarQT128.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "lidar",
+          "address": "192.168.1.214"
+        }
+      ]
+    },
+    {
+      "name": "lidar_right_lower",
+      "device": "PandarQT128.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "lidar",
+          "address": "192.168.1.215"
+        }
+      ]
+    },
+    {
+      "name": "radar_gateway",
+      "role": "switch",
+      "description": "TE-2000 between the main ECU's switch IC and the radars."
+    },
+    {
+      "name": "radar_front_center",
+      "device": "ARS548.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "radar",
+          "address": "10.13.1.114"
+        }
+      ]
+    },
+    {
+      "name": "radar_front_left",
+      "device": "ARS548.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "radar",
+          "address": "10.13.1.115"
+        }
+      ]
+    },
+    {
+      "name": "radar_front_right",
+      "device": "ARS548.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "radar",
+          "address": "10.13.1.116"
+        }
+      ]
+    },
+    {
+      "name": "radar_rear_center",
+      "device": "ARS548.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "radar",
+          "address": "10.13.1.117"
+        }
+      ]
+    },
+    {
+      "name": "radar_rear_left",
+      "device": "ARS548.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "radar",
+          "address": "10.13.1.118"
+        }
+      ]
+    },
+    {
+      "name": "radar_rear_right",
+      "device": "ARS548.device",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "radar",
+          "address": "10.13.1.119"
+        }
+      ]
+    },
+    {
+      "name": "gnss",
+      "role": "sensor",
+      "description": "Septentrio AsteRx SB3 GNSS receiver.",
+      "interfaces": [
+        {
+          "name": "eth",
+          "network": "hmi",
+          "address": "192.168.20.102"
+        }
+      ]
+    },
+    {
+      "name": "imu",
+      "role": "sensor",
+      "interfaces": [
+        {
+          "name": "can",
+          "type": "can"
+        }
+      ]
+    },
+    {
+      "name": "vcu",
+      "role": "actuator",
+      "description": "Vehicle control unit.",
+      "interfaces": [
+        {
+          "name": "can1",
+          "type": "can"
+        },
+        {
+          "name": "can2",
+          "type": "can"
+        }
+      ]
+    },
+    {
+      "name": "brake",
+      "role": "actuator",
+      "description": "Brake unit.",
+      "interfaces": [
+        {
+          "name": "can",
+          "type": "can"
+        }
+      ]
+    }
+  ],
+  "bindings": [
+    {
+      "compute_unit": "main_ecu",
+      "environment": "main/host"
+    },
+    {
+      "compute_unit": "wrapper_ecu",
+      "environment": "main/host"
+    },
+    {
+      "compute_unit": "perception_ecu_1",
+      "environment": "perception1/host"
+    },
+    {
+      "compute_unit": "perception_ecu_2",
+      "environment": "perception2/host"
+    },
+    {
+      "peripheral": "lidar_rear_upper",
+      "device": "lidar_rear_upper"
+    },
+    {
+      "peripheral": "lidar_left_upper",
+      "device": "lidar_left_upper"
+    },
+    {
+      "peripheral": "lidar_rear_lower",
+      "device": "lidar_rear_lower"
+    },
+    {
+      "peripheral": "lidar_left_lower",
+      "device": "lidar_left_lower"
+    },
+    {
+      "peripheral": "lidar_front_upper",
+      "device": "lidar_front_upper"
+    },
+    {
+      "peripheral": "lidar_right_upper",
+      "device": "lidar_right_upper"
+    },
+    {
+      "peripheral": "lidar_front_lower",
+      "device": "lidar_front_lower"
+    },
+    {
+      "peripheral": "lidar_right_lower",
+      "device": "lidar_right_lower"
+    },
+    {
+      "peripheral": "radar_front_center",
+      "device": "radar_front_center"
+    },
+    {
+      "peripheral": "radar_front_left",
+      "device": "radar_front_left"
+    },
+    {
+      "peripheral": "radar_front_right",
+      "device": "radar_front_right"
+    },
+    {
+      "peripheral": "radar_rear_center",
+      "device": "radar_rear_center"
+    },
+    {
+      "peripheral": "radar_rear_left",
+      "device": "radar_rear_left"
+    },
+    {
+      "peripheral": "radar_rear_right",
+      "device": "radar_rear_right"
+    },
+    {
+      "peripheral": "gnss",
+      "device": "gnss"
+    },
+    {
+      "peripheral": "imu",
+      "device": "imu"
+    },
+    {
+      "peripheral": "vcu",
+      "device": "vcu"
+    },
+    {
+      "peripheral": "brake",
+      "device": "brake"
+    }
+  ],
+  "environments": [
+    {
+      "id": "main/host",
+      "device": "main",
+      "name": "host",
+      "kind": "host",
+      "network": "host",
+      "network_namespace": "main",
+      "address": "192.168.30.11",
+      "shared_memory": false,
+      "daemon_port": 8781,
+      "provides": ["gpu"],
+      "compute_units": ["main_ecu", "wrapper_ecu"]
+    },
+    {
+      "id": "sub/host",
+      "device": "sub",
+      "name": "host",
+      "kind": "host",
+      "network": "host",
+      "network_namespace": "sub",
+      "address": "192.168.30.21",
+      "shared_memory": false,
+      "daemon_port": 8784,
+      "provides": ["gpu"],
+      "compute_units": []
+    },
+    {
+      "id": "perception1/host",
+      "device": "perception1",
+      "name": "host",
+      "kind": "host",
+      "network": "host",
+      "network_namespace": "perception1",
+      "address": "192.168.30.31",
+      "shared_memory": false,
+      "daemon_port": 8782,
+      "provides": ["gpu"],
+      "compute_units": ["perception_ecu_1"]
+    },
+    {
+      "id": "perception2/host",
+      "device": "perception2",
+      "name": "host",
+      "kind": "host",
+      "network": "host",
+      "network_namespace": "perception2",
+      "address": "192.168.30.32",
+      "shared_memory": false,
+      "daemon_port": 8783,
+      "provides": ["gpu"],
+      "compute_units": ["perception_ecu_2"]
+    },
+    {
+      "id": "addon/host",
+      "device": "addon",
+      "name": "host",
+      "kind": "host",
+      "network": "host",
+      "network_namespace": "addon",
+      "address": "192.168.30.33",
+      "shared_memory": false,
+      "daemon_port": null,
+      "provides": [],
+      "compute_units": []
+    },
+    {
+      "id": "logging/host",
+      "device": "logging",
+      "name": "host",
+      "kind": "host",
+      "network": "host",
+      "network_namespace": "logging",
+      "address": "192.168.30.71",
+      "shared_memory": false,
+      "daemon_port": null,
+      "provides": [],
+      "compute_units": []
+    }
+  ],
+  "wiring": {
+    "devices": [
+      {
+        "id": "main",
+        "name": "main",
+        "parent": null,
+        "definition": "AutowareEcu.device",
+        "role": "ecu",
+        "hardware": "x86_64",
+        "description": "Main ECU.",
+        "interfaces": [
+          {
+            "name": "enp5s0f0np0",
+            "type": "ethernet",
+            "bitrate": 1000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "hmi",
+                "address": "192.168.20.11"
+              }
+            ]
+          },
+          {
+            "name": "enp5s0f1np1",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "dds",
+                "address": "192.168.30.11"
+              }
+            ]
+          },
+          {
+            "name": "enp3s0",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "Time synchronization of the sensors on the switch IC.",
+            "attachments": []
+          },
+          {
+            "name": "enp4s0",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "Sensor data on the switch IC.",
+            "attachments": [
+              {
+                "network": "lidar",
+                "address": "192.168.1.11"
+              },
+              {
+                "network": "radar",
+                "address": "10.13.1.166"
+              }
+            ]
+          },
+          {
+            "name": "fintekcan0",
+            "type": "can",
+            "bitrate": null,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "fintekcan3",
+            "type": "can",
+            "bitrate": null,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "peakcan0",
+            "type": "can",
+            "bitrate": null,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "peakcan1",
+            "type": "can",
+            "bitrate": null,
+            "description": "",
+            "attachments": []
+          }
+        ],
+        "environments": ["main/host"]
+      },
+      {
+        "id": "main.switch",
+        "name": "switch",
+        "parent": "main",
+        "definition": "SwitchIc.device",
+        "role": "switch",
+        "hardware": null,
+        "description": "10GbE switch IC on the board of an Autoware ECU.",
+        "interfaces": [
+          {
+            "name": "cpu0",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "Data port of the host.",
+            "attachments": []
+          },
+          {
+            "name": "cpu1",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "Time synchronization port of the host.",
+            "attachments": []
+          },
+          {
+            "name": "link",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "Port to the switch IC of the other Autoware ECU.",
+            "attachments": []
+          },
+          {
+            "name": "p1",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "p2",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "p3",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "p4",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "p5",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "p6",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": []
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "sub",
+        "name": "sub",
+        "parent": null,
+        "definition": "AutowareEcu.device",
+        "role": "ecu",
+        "hardware": "x86_64",
+        "description": "Sub ECU.",
+        "interfaces": [
+          {
+            "name": "enp5s0f0np0",
+            "type": "ethernet",
+            "bitrate": 1000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "hmi",
+                "address": "192.168.20.21"
+              }
+            ]
+          },
+          {
+            "name": "enp5s0f1np1",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "dds",
+                "address": "192.168.30.21"
+              }
+            ]
+          },
+          {
+            "name": "enp3s0",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "Time synchronization of the sensors on the switch IC.",
+            "attachments": []
+          },
+          {
+            "name": "enp4s0",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "Sensor data on the switch IC.",
+            "attachments": [
+              {
+                "network": "lidar",
+                "address": "192.168.1.21"
+              },
+              {
+                "network": "radar",
+                "address": "10.13.1.176"
+              }
+            ]
+          },
+          {
+            "name": "fintekcan0",
+            "type": "can",
+            "bitrate": null,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "fintekcan3",
+            "type": "can",
+            "bitrate": null,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "peakcan0",
+            "type": "can",
+            "bitrate": null,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "peakcan1",
+            "type": "can",
+            "bitrate": null,
+            "description": "",
+            "attachments": []
+          }
+        ],
+        "environments": ["sub/host"]
+      },
+      {
+        "id": "sub.switch",
+        "name": "switch",
+        "parent": "sub",
+        "definition": "SwitchIc.device",
+        "role": "switch",
+        "hardware": null,
+        "description": "10GbE switch IC on the board of an Autoware ECU.",
+        "interfaces": [
+          {
+            "name": "cpu0",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "Data port of the host.",
+            "attachments": []
+          },
+          {
+            "name": "cpu1",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "Time synchronization port of the host.",
+            "attachments": []
+          },
+          {
+            "name": "link",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "Port to the switch IC of the other Autoware ECU.",
+            "attachments": []
+          },
+          {
+            "name": "p1",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "p2",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "p3",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "p4",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "p5",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "p6",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": []
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "perception1",
+        "name": "perception1",
+        "parent": null,
+        "definition": "PerceptionEcu.device",
+        "role": "ecu",
+        "hardware": "jetson_orin",
+        "description": "Perception ECU of the camera group.",
+        "interfaces": [
+          {
+            "name": "mgbe0",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "mgbe1",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "dds",
+                "address": "192.168.30.31"
+              }
+            ]
+          },
+          {
+            "name": "enP1p1s0",
+            "type": "ethernet",
+            "bitrate": 1000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "hmi",
+                "address": "192.168.20.31"
+              }
+            ]
+          }
+        ],
+        "environments": ["perception1/host"]
+      },
+      {
+        "id": "perception2",
+        "name": "perception2",
+        "parent": null,
+        "definition": "PerceptionEcu.device",
+        "role": "ecu",
+        "hardware": "jetson_orin",
+        "description": "Perception ECU of the add-on cameras.",
+        "interfaces": [
+          {
+            "name": "mgbe0",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "addon",
+                "address": "192.168.90.32"
+              }
+            ]
+          },
+          {
+            "name": "mgbe1",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "dds",
+                "address": "192.168.30.32"
+              }
+            ]
+          },
+          {
+            "name": "enP1p1s0",
+            "type": "ethernet",
+            "bitrate": 1000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "hmi",
+                "address": "192.168.20.32"
+              }
+            ]
+          }
+        ],
+        "environments": ["perception2/host"]
+      },
+      {
+        "id": "addon",
+        "name": "addon",
+        "parent": null,
+        "definition": null,
+        "role": "ecu",
+        "hardware": "x86_64",
+        "description": "Add-on ECU.",
+        "interfaces": [
+          {
+            "name": "enp7s0",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "dds",
+                "address": "192.168.30.33"
+              }
+            ]
+          },
+          {
+            "name": "enp3s0f1",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "addon",
+                "address": "192.168.90.33"
+              }
+            ]
+          },
+          {
+            "name": "enp0s31f6",
+            "type": "ethernet",
+            "bitrate": 1000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "hmi",
+                "address": "192.168.20.33"
+              }
+            ]
+          }
+        ],
+        "environments": ["addon/host"]
+      },
+      {
+        "id": "logging",
+        "name": "logging",
+        "parent": null,
+        "definition": null,
+        "role": "ecu",
+        "hardware": "x86_64",
+        "description": "Logging ECU.",
+        "interfaces": [
+          {
+            "name": "enp3s0f0np0",
+            "type": "ethernet",
+            "bitrate": 10000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "dds",
+                "address": "192.168.30.71"
+              }
+            ]
+          },
+          {
+            "name": "enp8s0",
+            "type": "ethernet",
+            "bitrate": 1000000000,
+            "description": "",
+            "attachments": [
+              {
+                "network": "hmi",
+                "address": "192.168.20.71"
+              }
+            ]
+          }
+        ],
+        "environments": ["logging/host"]
+      },
+      {
+        "id": "hub_10g",
+        "name": "hub_10g",
+        "parent": null,
+        "definition": null,
+        "role": "switch",
+        "hardware": null,
+        "description": "10GbE switch between the ECUs.",
+        "interfaces": [],
+        "environments": []
+      },
+      {
+        "id": "hub_1g",
+        "name": "hub_1g",
+        "parent": null,
+        "definition": null,
+        "role": "switch",
+        "hardware": null,
+        "description": "1GbE switch of the HMI devices and the ECUs.",
+        "interfaces": [],
+        "environments": []
+      },
+      {
+        "id": "lidar_rear_upper",
+        "name": "lidar_rear_upper",
+        "parent": null,
+        "definition": "Pandar128E4X.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Hesai Pandar128E4X LiDAR.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "lidar",
+                "address": "192.168.1.202"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "lidar_left_upper",
+        "name": "lidar_left_upper",
+        "parent": null,
+        "definition": "Pandar128E4X.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Hesai Pandar128E4X LiDAR.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "lidar",
+                "address": "192.168.1.203"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "lidar_rear_lower",
+        "name": "lidar_rear_lower",
+        "parent": null,
+        "definition": "PandarQT128.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Hesai PandarQT128 LiDAR.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "lidar",
+                "address": "192.168.1.212"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "lidar_left_lower",
+        "name": "lidar_left_lower",
+        "parent": null,
+        "definition": "PandarQT128.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Hesai PandarQT128 LiDAR.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "lidar",
+                "address": "192.168.1.213"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "lidar_front_upper",
+        "name": "lidar_front_upper",
+        "parent": null,
+        "definition": "Pandar128E4X.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Hesai Pandar128E4X LiDAR.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "lidar",
+                "address": "192.168.1.204"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "lidar_right_upper",
+        "name": "lidar_right_upper",
+        "parent": null,
+        "definition": "Pandar128E4X.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Hesai Pandar128E4X LiDAR.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "lidar",
+                "address": "192.168.1.205"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "lidar_front_lower",
+        "name": "lidar_front_lower",
+        "parent": null,
+        "definition": "PandarQT128.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Hesai PandarQT128 LiDAR.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "lidar",
+                "address": "192.168.1.214"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "lidar_right_lower",
+        "name": "lidar_right_lower",
+        "parent": null,
+        "definition": "PandarQT128.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Hesai PandarQT128 LiDAR.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "lidar",
+                "address": "192.168.1.215"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "radar_gateway",
+        "name": "radar_gateway",
+        "parent": null,
+        "definition": null,
+        "role": "switch",
+        "hardware": null,
+        "description": "TE-2000 between the main ECU's switch IC and the radars.",
+        "interfaces": [],
+        "environments": []
+      },
+      {
+        "id": "radar_front_center",
+        "name": "radar_front_center",
+        "parent": null,
+        "definition": "ARS548.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Continental ARS548 radar.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "radar",
+                "address": "10.13.1.114"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "radar_front_left",
+        "name": "radar_front_left",
+        "parent": null,
+        "definition": "ARS548.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Continental ARS548 radar.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "radar",
+                "address": "10.13.1.115"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "radar_front_right",
+        "name": "radar_front_right",
+        "parent": null,
+        "definition": "ARS548.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Continental ARS548 radar.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "radar",
+                "address": "10.13.1.116"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "radar_rear_center",
+        "name": "radar_rear_center",
+        "parent": null,
+        "definition": "ARS548.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Continental ARS548 radar.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "radar",
+                "address": "10.13.1.117"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "radar_rear_left",
+        "name": "radar_rear_left",
+        "parent": null,
+        "definition": "ARS548.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Continental ARS548 radar.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "radar",
+                "address": "10.13.1.118"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "radar_rear_right",
+        "name": "radar_rear_right",
+        "parent": null,
+        "definition": "ARS548.device",
+        "role": "sensor",
+        "hardware": null,
+        "description": "Continental ARS548 radar.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "radar",
+                "address": "10.13.1.119"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "gnss",
+        "name": "gnss",
+        "parent": null,
+        "definition": null,
+        "role": "sensor",
+        "hardware": null,
+        "description": "Septentrio AsteRx SB3 GNSS receiver.",
+        "interfaces": [
+          {
+            "name": "eth",
+            "type": "ethernet",
+            "bitrate": null,
+            "description": "",
+            "attachments": [
+              {
+                "network": "hmi",
+                "address": "192.168.20.102"
+              }
+            ]
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "imu",
+        "name": "imu",
+        "parent": null,
+        "definition": null,
+        "role": "sensor",
+        "hardware": null,
+        "description": "",
+        "interfaces": [
+          {
+            "name": "can",
+            "type": "can",
+            "bitrate": null,
+            "description": "",
+            "attachments": []
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "vcu",
+        "name": "vcu",
+        "parent": null,
+        "definition": null,
+        "role": "actuator",
+        "hardware": null,
+        "description": "Vehicle control unit.",
+        "interfaces": [
+          {
+            "name": "can1",
+            "type": "can",
+            "bitrate": null,
+            "description": "",
+            "attachments": []
+          },
+          {
+            "name": "can2",
+            "type": "can",
+            "bitrate": null,
+            "description": "",
+            "attachments": []
+          }
+        ],
+        "environments": []
+      },
+      {
+        "id": "brake",
+        "name": "brake",
+        "parent": null,
+        "definition": null,
+        "role": "actuator",
+        "hardware": null,
+        "description": "Brake unit.",
+        "interfaces": [
+          {
+            "name": "can",
+            "type": "can",
+            "bitrate": null,
+            "description": "",
+            "attachments": []
+          }
+        ],
+        "environments": []
+      }
+    ],
+    "connections": [
+      {
+        "id": "c0",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": "main",
+        "endpoints": [
+          {
+            "device": "main",
+            "interface": "enp4s0"
+          },
+          {
+            "device": "main.switch",
+            "interface": "cpu0"
+          }
+        ]
+      },
+      {
+        "id": "c1",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": "main",
+        "endpoints": [
+          {
+            "device": "main",
+            "interface": "enp3s0"
+          },
+          {
+            "device": "main.switch",
+            "interface": "cpu1"
+          }
+        ]
+      },
+      {
+        "id": "c2",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": "sub",
+        "endpoints": [
+          {
+            "device": "sub",
+            "interface": "enp4s0"
+          },
+          {
+            "device": "sub.switch",
+            "interface": "cpu0"
+          }
+        ]
+      },
+      {
+        "id": "c3",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": "sub",
+        "endpoints": [
+          {
+            "device": "sub",
+            "interface": "enp3s0"
+          },
+          {
+            "device": "sub.switch",
+            "interface": "cpu1"
+          }
+        ]
+      },
+      {
+        "id": "c4",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "main",
+            "interface": "enp5s0f1np1"
+          },
+          {
+            "device": "hub_10g",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c5",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "sub",
+            "interface": "enp5s0f1np1"
+          },
+          {
+            "device": "hub_10g",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c6",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "perception1",
+            "interface": "mgbe1"
+          },
+          {
+            "device": "hub_10g",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c7",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "perception2",
+            "interface": "mgbe1"
+          },
+          {
+            "device": "hub_10g",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c8",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "addon",
+            "interface": "enp7s0"
+          },
+          {
+            "device": "hub_10g",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c9",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "logging",
+            "interface": "enp3s0f0np0"
+          },
+          {
+            "device": "hub_10g",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c10",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 1000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "main",
+            "interface": "enp5s0f0np0"
+          },
+          {
+            "device": "hub_1g",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c11",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 1000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "sub",
+            "interface": "enp5s0f0np0"
+          },
+          {
+            "device": "hub_1g",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c12",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 1000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "perception1",
+            "interface": "enP1p1s0"
+          },
+          {
+            "device": "hub_1g",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c13",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 1000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "perception2",
+            "interface": "enP1p1s0"
+          },
+          {
+            "device": "hub_1g",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c14",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 1000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "addon",
+            "interface": "enp0s31f6"
+          },
+          {
+            "device": "hub_1g",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c15",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 1000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "logging",
+            "interface": "enp8s0"
+          },
+          {
+            "device": "hub_1g",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c16",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": null,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "gnss",
+            "interface": "eth"
+          },
+          {
+            "device": "hub_1g",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c17",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "perception2",
+            "interface": "mgbe0"
+          },
+          {
+            "device": "addon",
+            "interface": "enp3s0f1"
+          }
+        ]
+      },
+      {
+        "id": "c18",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "main.switch",
+            "interface": "link"
+          },
+          {
+            "device": "sub.switch",
+            "interface": "link"
+          }
+        ]
+      },
+      {
+        "id": "c19",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "main.switch",
+            "interface": "p1"
+          },
+          {
+            "device": "lidar_rear_upper",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c20",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "main.switch",
+            "interface": "p2"
+          },
+          {
+            "device": "lidar_left_upper",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c21",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "main.switch",
+            "interface": "p3"
+          },
+          {
+            "device": "lidar_rear_lower",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c22",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "main.switch",
+            "interface": "p4"
+          },
+          {
+            "device": "lidar_left_lower",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c23",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "sub.switch",
+            "interface": "p1"
+          },
+          {
+            "device": "lidar_front_upper",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c24",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "sub.switch",
+            "interface": "p2"
+          },
+          {
+            "device": "lidar_right_upper",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c25",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "sub.switch",
+            "interface": "p3"
+          },
+          {
+            "device": "lidar_front_lower",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c26",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "sub.switch",
+            "interface": "p4"
+          },
+          {
+            "device": "lidar_right_lower",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c27",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": 10000000000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "main.switch",
+            "interface": "p5"
+          },
+          {
+            "device": "radar_gateway",
+            "interface": null
+          }
+        ]
+      },
+      {
+        "id": "c28",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": null,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "radar_gateway",
+            "interface": null
+          },
+          {
+            "device": "radar_front_center",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c29",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": null,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "radar_gateway",
+            "interface": null
+          },
+          {
+            "device": "radar_front_left",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c30",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": null,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "radar_gateway",
+            "interface": null
+          },
+          {
+            "device": "radar_front_right",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c31",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": null,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "radar_gateway",
+            "interface": null
+          },
+          {
+            "device": "radar_rear_center",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c32",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": null,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "radar_gateway",
+            "interface": null
+          },
+          {
+            "device": "radar_rear_left",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c33",
+        "kind": "link",
+        "name": null,
+        "type": "ethernet",
+        "bitrate": null,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "radar_gateway",
+            "interface": null
+          },
+          {
+            "device": "radar_rear_right",
+            "interface": "eth"
+          }
+        ]
+      },
+      {
+        "id": "c34",
+        "kind": "bus",
+        "name": "vcu_can_1",
+        "type": "can",
+        "bitrate": 500000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "main",
+            "interface": "fintekcan0"
+          },
+          {
+            "device": "vcu",
+            "interface": "can1"
+          }
+        ]
+      },
+      {
+        "id": "c35",
+        "kind": "bus",
+        "name": "vcu_can_2",
+        "type": "can",
+        "bitrate": 500000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "main",
+            "interface": "peakcan0"
+          },
+          {
+            "device": "vcu",
+            "interface": "can2"
+          }
+        ]
+      },
+      {
+        "id": "c36",
+        "kind": "bus",
+        "name": "brake_can",
+        "type": "can",
+        "bitrate": 500000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "main",
+            "interface": "peakcan1"
+          },
+          {
+            "device": "brake",
+            "interface": "can"
+          }
+        ]
+      },
+      {
+        "id": "c37",
+        "kind": "bus",
+        "name": "imu_can",
+        "type": "can",
+        "bitrate": 500000,
+        "description": "",
+        "internal": null,
+        "endpoints": [
+          {
+            "device": "main",
+            "interface": "fintekcan3"
+          },
+          {
+            "device": "imu",
+            "interface": "can"
+          }
+        ]
+      }
+    ]
+  },
+  "time_sync": [
+    {
+      "name": "ecus",
+      "description": "Main ECU's system clock to the other ECUs over the 1GbE switch.",
+      "profile": "ptpv2",
+      "reference": "ntp",
+      "source": null,
+      "grandmaster": {
+        "device": "main",
+        "interface": "enp5s0f0np0"
+      },
+      "members": [
+        {
+          "device": "sub",
+          "interface": "enp5s0f0np0",
+          "path": ["c10", "c11"]
+        },
+        {
+          "device": "perception1",
+          "interface": "enP1p1s0",
+          "path": ["c10", "c12"]
+        },
+        {
+          "device": "perception2",
+          "interface": "enP1p1s0",
+          "path": ["c10", "c13"]
+        },
+        {
+          "device": "addon",
+          "interface": "enp0s31f6",
+          "path": ["c10", "c14"]
+        },
+        {
+          "device": "logging",
+          "interface": "enp8s0",
+          "path": ["c10", "c15"]
+        }
+      ]
+    },
+    {
+      "name": "sensors_main",
+      "description": "Main ECU's system clock to the sensors on its switch IC.",
+      "profile": "gptp",
+      "reference": "ntp",
+      "source": null,
+      "grandmaster": {
+        "device": "main",
+        "interface": "enp3s0"
+      },
+      "members": [
+        {
+          "device": "lidar_rear_upper",
+          "interface": "eth",
+          "path": ["c1", "c19"]
+        },
+        {
+          "device": "lidar_left_upper",
+          "interface": "eth",
+          "path": ["c1", "c20"]
+        },
+        {
+          "device": "lidar_rear_lower",
+          "interface": "eth",
+          "path": ["c1", "c21"]
+        },
+        {
+          "device": "lidar_left_lower",
+          "interface": "eth",
+          "path": ["c1", "c22"]
+        },
+        {
+          "device": "radar_front_center",
+          "interface": "eth",
+          "path": ["c1", "c27", "c28"]
+        },
+        {
+          "device": "radar_front_left",
+          "interface": "eth",
+          "path": ["c1", "c27", "c29"]
+        },
+        {
+          "device": "radar_front_right",
+          "interface": "eth",
+          "path": ["c1", "c27", "c30"]
+        },
+        {
+          "device": "radar_rear_center",
+          "interface": "eth",
+          "path": ["c1", "c27", "c31"]
+        },
+        {
+          "device": "radar_rear_left",
+          "interface": "eth",
+          "path": ["c1", "c27", "c32"]
+        },
+        {
+          "device": "radar_rear_right",
+          "interface": "eth",
+          "path": ["c1", "c27", "c33"]
+        }
+      ]
+    },
+    {
+      "name": "sensors_sub",
+      "description": "Sub ECU's clock, synchronized to the main ECU, to the LiDARs on its switch IC.",
+      "profile": "gptp",
+      "reference": null,
+      "source": "ecus",
+      "grandmaster": {
+        "device": "sub",
+        "interface": "enp3s0"
+      },
+      "members": [
+        {
+          "device": "lidar_front_upper",
+          "interface": "eth",
+          "path": ["c3", "c23"]
+        },
+        {
+          "device": "lidar_right_upper",
+          "interface": "eth",
+          "path": ["c3", "c24"]
+        },
+        {
+          "device": "lidar_front_lower",
+          "interface": "eth",
+          "path": ["c3", "c25"]
+        },
+        {
+          "device": "lidar_right_lower",
+          "interface": "eth",
+          "path": ["c3", "c26"]
+        }
+      ]
+    }
+  ],
+  "peripherals": [
+    {
+      "name": "lidar_rear_upper",
+      "device": "lidar_rear_upper",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.202"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.11",
+          "path": ["c0", "c19"]
+        }
+      ]
+    },
+    {
+      "name": "lidar_left_upper",
+      "device": "lidar_left_upper",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.203"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.11",
+          "path": ["c0", "c20"]
+        }
+      ]
+    },
+    {
+      "name": "lidar_rear_lower",
+      "device": "lidar_rear_lower",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.212"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.11",
+          "path": ["c0", "c21"]
+        }
+      ]
+    },
+    {
+      "name": "lidar_left_lower",
+      "device": "lidar_left_lower",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.213"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.11",
+          "path": ["c0", "c22"]
+        }
+      ]
+    },
+    {
+      "name": "lidar_front_upper",
+      "device": "lidar_front_upper",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.204"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.11",
+          "path": ["c0", "c18", "c23"]
+        }
+      ]
+    },
+    {
+      "name": "lidar_right_upper",
+      "device": "lidar_right_upper",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.205"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.11",
+          "path": ["c0", "c18", "c24"]
+        }
+      ]
+    },
+    {
+      "name": "lidar_front_lower",
+      "device": "lidar_front_lower",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.214"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.11",
+          "path": ["c0", "c18", "c25"]
+        }
+      ]
+    },
+    {
+      "name": "lidar_right_lower",
+      "device": "lidar_right_lower",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.215"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "lidar",
+          "address": "192.168.1.11",
+          "path": ["c0", "c18", "c26"]
+        }
+      ]
+    },
+    {
+      "name": "radar_front_center",
+      "device": "radar_front_center",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "radar",
+          "address": "10.13.1.114"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "radar",
+          "address": "10.13.1.166",
+          "path": ["c0", "c27", "c28"]
+        }
+      ]
+    },
+    {
+      "name": "radar_front_left",
+      "device": "radar_front_left",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "radar",
+          "address": "10.13.1.115"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "radar",
+          "address": "10.13.1.166",
+          "path": ["c0", "c27", "c29"]
+        }
+      ]
+    },
+    {
+      "name": "radar_front_right",
+      "device": "radar_front_right",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "radar",
+          "address": "10.13.1.116"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "radar",
+          "address": "10.13.1.166",
+          "path": ["c0", "c27", "c30"]
+        }
+      ]
+    },
+    {
+      "name": "radar_rear_center",
+      "device": "radar_rear_center",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "radar",
+          "address": "10.13.1.117"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "radar",
+          "address": "10.13.1.166",
+          "path": ["c0", "c27", "c31"]
+        }
+      ]
+    },
+    {
+      "name": "radar_rear_left",
+      "device": "radar_rear_left",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "radar",
+          "address": "10.13.1.118"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "radar",
+          "address": "10.13.1.166",
+          "path": ["c0", "c27", "c32"]
+        }
+      ]
+    },
+    {
+      "name": "radar_rear_right",
+      "device": "radar_rear_right",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "radar",
+          "address": "10.13.1.119"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp4s0",
+          "peer_interface": "eth",
+          "network": "radar",
+          "address": "10.13.1.166",
+          "path": ["c0", "c27", "c33"]
+        }
+      ]
+    },
+    {
+      "name": "gnss",
+      "device": "gnss",
+      "component": "sensing",
+      "description": "",
+      "addresses": [
+        {
+          "interface": "eth",
+          "network": "hmi",
+          "address": "192.168.20.102"
+        }
+      ],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "enp5s0f0np0",
+          "peer_interface": "eth",
+          "network": "hmi",
+          "address": "192.168.20.11",
+          "path": ["c10", "c16"]
+        }
+      ]
+    },
+    {
+      "name": "imu",
+      "device": "imu",
+      "component": "sensing",
+      "description": "",
+      "addresses": [],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "fintekcan3",
+          "peer_interface": "can",
+          "network": null,
+          "address": null,
+          "path": ["c37"]
+        }
+      ]
+    },
+    {
+      "name": "vcu",
+      "device": "vcu",
+      "component": "vehicle",
+      "description": "",
+      "addresses": [],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "fintekcan0",
+          "peer_interface": "can1",
+          "network": null,
+          "address": null,
+          "path": ["c34"]
+        },
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "peakcan0",
+          "peer_interface": "can2",
+          "network": null,
+          "address": null,
+          "path": ["c35"]
+        }
+      ]
+    },
+    {
+      "name": "brake",
+      "device": "brake",
+      "component": "vehicle",
+      "description": "",
+      "addresses": [],
+      "hosts": [
+        {
+          "compute_unit": "main_ecu",
+          "environment": "main/host",
+          "device": "main",
+          "interface": "peakcan1",
+          "peer_interface": "can",
+          "network": null,
+          "address": null,
+          "path": ["c36"]
+        }
+      ]
+    }
+  ]
+}

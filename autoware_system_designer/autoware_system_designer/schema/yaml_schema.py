@@ -317,6 +317,7 @@ def get_semantic_checks(
                     "modes",
                     "parameter_sets",
                     "compute_units",
+                    "peripherals",
                     "components",
                     "connections",
                     "node_groups",
@@ -331,7 +332,7 @@ def get_semantic_checks(
         return (
             _format_version_semantics,
             _variant_forbidden_root_fields_semantics(
-                forbidden_fields=("networks", "devices", "bindings", "main_environment"),
+                forbidden_fields=("networks", "devices", "connections", "time_sync", "bindings", "main_environment"),
                 message_prefix="Variant rule",
             ),
         )
