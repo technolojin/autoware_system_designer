@@ -105,6 +105,7 @@ ACTIVITIES = {
             "js/diagrams/wiring_model.js",
             "js/diagrams/wiring_layout.js",
             "js/diagrams/wiring_diagram.js",
+            "js/diagrams/unit_diagram.js",
             "js/activities/architecture/index.js",
         ),
         "styles": ("css/activities/architecture.css",),

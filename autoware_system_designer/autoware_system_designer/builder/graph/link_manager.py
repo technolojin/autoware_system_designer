@@ -738,6 +738,7 @@ class LinkManager:
                 self.instance.resolved_path,
                 remap_target=cfg_out_port.remap_target,
                 role=cfg_out_port.port_role,
+                message_size=cfg_out_port.message_size,
             )
             if cfg_out_port.global_topic is not None:
                 out_port_instance.is_global = True

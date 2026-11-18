@@ -277,7 +277,7 @@ def test_systems_lists_modes_units_and_deploy_variants(served):
         ("infra", "offboard"),
     ]
     assert set(system["compute_units"][0]) == {"name", "kind", "description", "status"}
-    assert system["deploy_variants"] == [{"name": "car_a", "arguments": {"vehicle_id": "a"}}]
+    assert system["deploy_variants"] == [{"name": "car_a", "arguments": {"vehicle_id": "a"}, "ee_architecture": None}]
     assert system["pages"]["launch"] == f"{SITE}/index.html?activity=launch"
     assert served.request("GET", system["pages"]["workbench"])[0].status == 200
 

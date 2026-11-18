@@ -1,4 +1,4 @@
-autoware_system_design_format: 0.4.1
+autoware_system_design_format: 0.5.0
 
 name: PlanningDummy.node
 
@@ -34,6 +34,7 @@ subscribers:
 publishers:
   - name: mission_planning/route
     message_type: std_msgs/msg/String
+    message_size: 2k
 
 param_files: []
 param_values: []

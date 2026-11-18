@@ -1,0 +1,15 @@
+autoware_system_design_format: 0.5.0
+
+name: DemoCamera.device
+
+description: Camera on a GMSL serial link to its host.
+
+role: sensor
+
+hardware: camera
+
+interfaces:
+  - name: gmsl0
+    type: gmsl
+    bitrate: 6G
+    data_rate: 1G

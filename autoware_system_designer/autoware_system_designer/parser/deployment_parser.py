@@ -80,7 +80,15 @@ def _parse_deployments_list(deployments_path: str) -> Tuple[str, List[Dict[str, 
             raise ValidationError(
                 f"deploy_list[{idx}].arguments must be a list in deployments table: {deployments_path}"
             )
-        deploy_list.append({"name": name, "arguments": arguments})
+        entry = {"name": name, "arguments": arguments}
+        ee_architecture = item.get("ee_architecture")
+        if ee_architecture is not None:
+            if not isinstance(ee_architecture, str) or not ee_architecture:
+                raise ValidationError(
+                    f"deploy_list[{idx}].ee_architecture must be an entity name in deployments table: {deployments_path}"
+                )
+            entry["ee_architecture"] = ee_architecture
+        deploy_list.append(entry)
 
     ee_architectures = config_yaml.get("ee_architectures") or []
     if not isinstance(ee_architectures, list) or not all(isinstance(name, str) and name for name in ee_architectures):

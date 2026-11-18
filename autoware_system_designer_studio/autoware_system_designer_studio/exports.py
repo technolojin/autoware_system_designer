@@ -223,7 +223,14 @@ class SystemExport:
                 for item in (items if isinstance(items, list) else [])
                 if isinstance(item, dict) and isinstance(item.get("name"), str)
             }
-            views.append({"name": variant["name"], "arguments": arguments})
+            architecture = variant.get("ee_architecture")
+            views.append(
+                {
+                    "name": variant["name"],
+                    "arguments": arguments,
+                    "ee_architecture": architecture if isinstance(architecture, str) else None,
+                }
+            )
         return views
 
     def to_view(self, served_units: Optional[Iterable[str]], pages: dict[str, str]) -> dict[str, Any]:

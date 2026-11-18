@@ -79,6 +79,7 @@
             "is_global": false,
             "is_outward": true,
             "is_remapped": false,
+            "message_size": null,
             "msg_type": "autoware_map_msgs/msg/LaneletMapBin",
             "name": "vector_map",
             "namespace": [
@@ -241,6 +242,7 @@
           "is_global": false,
           "is_outward": false,
           "is_remapped": false,
+          "message_size": null,
           "msg_type": "autoware_map_msgs/msg/LaneletMapBin",
           "name": "vector_map",
           "namespace": [

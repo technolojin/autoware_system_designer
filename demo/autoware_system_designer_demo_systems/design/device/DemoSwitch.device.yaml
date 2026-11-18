@@ -1,0 +1,19 @@
+autoware_system_design_format: 0.5.0
+
+name: DemoSwitch.device
+
+description: Unmanaged Ethernet switch with four 1G ports and one 10G uplink.
+
+role: switch
+
+interfaces:
+  - name: p1
+    bitrate: 1G
+  - name: p2
+    bitrate: 1G
+  - name: p3
+    bitrate: 1G
+  - name: p4
+    bitrate: 1G
+  - name: up
+    bitrate: 10G

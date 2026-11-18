@@ -58,6 +58,7 @@ Represents a single ROS 2 node.
     - **Default**: If not provided, it defaults to `~/output/<name>`.
     - **Required when**: The node implementation uses a specific topic name that does not follow the `~/output/` convention.
   - `global`: (Optional) If set, the output topic is published to a global topic name (e.g., `/tf`).
+  - `message_size`: (Optional, format 0.5.0) Typical serialized size of one message in bytes, as an integer or with suffix `k`, `M`, `G` (e.g., `2.4M`). With the rate of the port's output event it gives the bit rate an E/E architecture analysis puts on the wiring.
 - `servers`: (Optional) List of service/action servers.
   - `name`: Server name.
   - `description`: (Optional) Brief explanation of the server.
@@ -224,7 +225,12 @@ Top-level entry point defining the complete system.
   - `requires`: (Optional) Capabilities the unit needs from the execution environment it is launched in (e.g., `[gpu]`). Names are free (`^[a-z][a-z0-9_]*$`); an E/E architecture may bind the unit only to an environment whose `provides` holds every one of them.
 - `peripherals`: (Optional) Hardware outside the compute units that components talk to (sensors, actuators, vehicle controllers), by logical name. The system design names no device; an E/E architecture binds each name to one.
   - `name`: Peripheral identifier (`^[a-z][a-z0-9_]*$`); the key an E/E architecture binds by.
-  - `component`: (Optional) Top-level component whose nodes talk to the peripheral. The interfaces and addresses the component's compute units reach the device by are derived from it.
+  - `node`: (Optional) Path of the node that drives the peripheral (e.g., `/sensing/lidar/lidar_top`).
+  - `component`: (Optional) Top-level component whose nodes talk to the peripheral; derived from `node` when omitted. The interfaces and addresses the component's compute units reach the device by are derived from it.
+  - `parameters`: (Optional, with `node`) Parameters of the node whose values the bound E/E architecture gives. Network information of the hardware belongs here, not in parameter files.
+    - `name`: Parameter name of the node.
+    - `value`: `address` (the peripheral's address on the network both are on), `interface` (the peripheral's interface), `network`, `host_address` or `host_interface` (of the compute unit's device that reaches the peripheral), or `device` (the bound device instance).
+    - Each parameter is set to the system argument `<peripheral>_<parameter>`, declared by the build; a deployment that names an E/E architecture sets it (Section 4.5).
   - `description`: (Optional) Brief explanation of the peripheral.
 - `components`: Top-level instances.
   - `name`: Name of the component instance.
@@ -287,6 +293,7 @@ Describes the hardware a system is deployed on: device instances with their inte
     - `name`: Interface name on the device (e.g., `eth0`, `can0`, `p1`); no dots.
     - `type`: (Optional, inline only) `ethernet` (default), `can`, `lin`, `flexray`, `serial`, `gmsl`, `usb` or `other`.
     - `bitrate`: (Optional, inline only) Capacity in bit/s, as an integer or with suffix `k`, `M`, `G` (e.g., `500k`, `10G`).
+    - `data_rate`: (Optional, inline only) Data the device sends on the interface in bit/s, in the form of `bitrate` (e.g., a LiDAR's `200M`).
     - `network`, `address`: (Optional) Declared network the interface is on and its fixed address there, the same on every vehicle of the architecture.
     - `networks`: (Optional) List of `{network, address}` for an interface on several networks (VLANs, secondary addresses).
   - `environments`: Execution environments on the device. A device without one hosts no compute unit.
@@ -317,7 +324,7 @@ Describes the hardware a system is deployed on: device instances with their inte
   - `compute_unit` + `environment`: Name of an `onboard` compute unit and the `<device>/<environment>` it is launched in. Several units may share one environment. The build fails when the environment does not provide a capability the unit requires.
   - `peripheral` + `device`: Name of a peripheral of the system and the device instance it is.
 
-A deployments table lists the architectures its system is deployed on under `ee_architectures`. Each is checked against the system and exported with it:
+A deployments table lists the architectures its system is deployed on under `ee_architectures`. Each is checked against the system and exported with it. A deploy names the architecture of its vehicle with `ee_architecture`, one of the listed; the build sets the deploy's argument of every peripheral parameter from it, and a studio daemon running in another architecture refuses the deploy:
 
 ```yaml
 base: TypeAlpha.system
@@ -325,6 +332,7 @@ ee_architectures:
   - TypeAlphaBridge.ee_architecture
 deploy_list:
   - name: vehicle_x
+    ee_architecture: TypeAlphaBridge.ee_architecture
 ```
 
 **Rules:**
@@ -340,8 +348,9 @@ deploy_list:
 
 - One record per environment, with its compute units and the address its daemon answers on.
 - `wiring`: every device, parts included, with its interfaces, and every connection with its capacity.
-- `peripherals`: for each, its device and addresses, and per compute unit of its component the interface, network and address that reach it and the connections on the way.
+- `peripherals`: for each, its device and addresses, per compute unit of its component the interface, network and address that reach it and the connections on the way, and the value of each of its node parameters.
 - `time_sync`: for each member, the connections from the grandmaster.
+- `analysis`: per mode, the flows into and out of the compute units and the load on each connection. A flow is one peripheral feeding one unit, at the `data_rate` of the device's interfaces, or the topics one unit publishes to another, each at its output rate times its `message_size`; topics between units of one device stay off the wiring and travel over Ethernet connections otherwise. The load of a link is that of its busiest direction, of a bus the sum of its senders; a load over the capacity warns.
 
 A variant (`base`) replaces `networks`, `devices`, `connections` and `time_sync` by `name` and `bindings` by `compute_unit` or `peripheral` under `override`, sets `main_environment` there, and drops entries under `remove` (see Section 5).
 
@@ -355,7 +364,7 @@ Describes one kind of hardware, instantiated by E/E architectures and as a part 
 - `description`: (Optional) Brief explanation of the device.
 - `role`: (Optional) `ecu`, `switch`, `router`, `sensor`, `actuator` or `other` (default).
 - `hardware`: (Optional) Hardware class.
-- `interfaces`: (Optional) Interfaces, each with `name`, `type`, `bitrate` and `description` as in Section 4.5.
+- `interfaces`: (Optional) Interfaces, each with `name`, `type`, `bitrate`, `data_rate` and `description` as in Section 4.5.
 - `environments`: (Optional) Execution environments, each with `name`, `kind`, `network`, `shared_memory`, `provides` and `description`.
 - `parts`: (Optional) Devices inside this one, e.g., the SoCs of a board or an on-board switch.
   - `name`: Part identifier.

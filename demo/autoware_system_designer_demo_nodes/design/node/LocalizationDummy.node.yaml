@@ -1,4 +1,4 @@
-autoware_system_design_format: 0.4.1
+autoware_system_design_format: 0.5.0
 
 name: LocalizationDummy.node
 
@@ -42,23 +42,29 @@ subscribers:
 publishers:
   - name: ros_transform
     message_type: tf2_msgs/msg/TFMessage
+    message_size: 800
     global: /tf
   - name: pose_with_covariance
     message_type: std_msgs/msg/Float64MultiArray
+    message_size: 400
     qos:
       reliability: reliable
       durability: transient_local
   - name: acceleration
     message_type: std_msgs/msg/Float64
+    message_size: 100
     qos:
       reliability: reliable
       durability: transient_local
   - name: initialization_state
     message_type: std_msgs/msg/UInt16
+    message_size: 16
   - name: kinematic_state
     message_type: std_msgs/msg/Float64MultiArray
+    message_size: 600
   - name: pose_estimator/pose_with_covariance
     message_type: std_msgs/msg/Float64MultiArray
+    message_size: 400
 
 param_files: []
 

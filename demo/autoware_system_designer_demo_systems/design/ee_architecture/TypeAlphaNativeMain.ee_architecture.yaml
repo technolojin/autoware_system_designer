@@ -10,6 +10,17 @@ override:
   devices:
     - name: ecu
       hardware: x86_64
+      interfaces:
+        - name: eth1
+          bitrate: 10G
+          network: sensor
+          address: 172.30.88.1
+        - name: gmsl0
+          type: gmsl
+          bitrate: 6G
+        - name: can0
+          type: can
+          bitrate: 500k
       environments:
         - name: host
           shared_memory: true

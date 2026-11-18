@@ -476,6 +476,7 @@ class ServeDaemon:
         if not isinstance(mode, str) or mode not in system.mode_keys():
             raise api.ApiError(api.INVALID_PARAMS, f"unknown mode {mode!r} of {system.id}")
         self._mode_conflict(system.id, mode)
+        self._check_deploy_architecture(system, api.str_param(params, "deploy"))
         launch_id = api.str_param(params, "launch")
         if launch_id is not None and not launch.valid_launch_id(launch_id):
             raise api.ApiError(api.INVALID_PARAMS, "launch must be an id of letters, digits, '_', '.' and '-'")
@@ -492,6 +493,19 @@ class ServeDaemon:
             entry[1] -= 1
             if not entry[1] and self._starting.get(key) is entry:
                 del self._starting[key]
+
+    def _check_deploy_architecture(self, system: exports.SystemExport, deploy: Optional[str]) -> None:
+        """Refuses a deploy built for another E/E architecture than the one this daemon runs in."""
+        if deploy is None or self.environment is None:
+            return
+        variant = next((v for v in system.deploy_variants() if v.get("name") == deploy), None)
+        wanted = (variant or {}).get("ee_architecture")
+        if wanted is not None and wanted != self.environment.architecture:
+            raise api.ApiError(
+                api.INVALID_PARAMS,
+                f"deploy variant {deploy!r} of {system.id} is for E/E architecture {wanted!r}; this daemon runs in "
+                f"{self.environment.architecture!r}",
+            )
 
     async def _start_unit(
         self, system: exports.SystemExport, compute_unit: str, mode: str, status: str, params: dict[str, Any]

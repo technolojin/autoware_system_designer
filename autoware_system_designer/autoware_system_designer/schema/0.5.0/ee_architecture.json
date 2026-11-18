@@ -3,15 +3,11 @@
   "title": "E/E Architecture Entity Schema 0.5.0",
   "description": "Schema for autoware_system_design_format E/E architecture entities",
   "type": "object",
-  "required": [
-    "name"
-  ],
+  "required": ["name"],
   "definitions": {
     "network": {
       "type": "object",
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -44,9 +40,7 @@
     },
     "device": {
       "type": "object",
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -63,14 +57,7 @@
         },
         "role": {
           "type": "string",
-          "enum": [
-            "ecu",
-            "switch",
-            "router",
-            "sensor",
-            "actuator",
-            "other"
-          ],
+          "enum": ["ecu", "switch", "router", "sensor", "actuator", "other"],
           "description": "ecu: hosts compute units; switch, router: forwards between its interfaces; sensor, actuator: peripheral hardware"
         },
         "hardware": {
@@ -81,9 +68,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "name"
-            ],
+            "required": ["name"],
             "additionalProperties": false,
             "properties": {
               "name": {
@@ -121,6 +106,19 @@
                   }
                 ]
               },
+              "data_rate": {
+                "description": "Data the device sends on the interface in bit/s: an integer, or a number with suffix k, M or G (e.g. 300M)",
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[0-9]+(\\.[0-9]+)?[kMG]?$"
+                  }
+                ]
+              },
               "network": {
                 "type": "string",
                 "description": "Name of a declared network"
@@ -133,9 +131,7 @@
                 "type": "array",
                 "items": {
                   "type": "object",
-                  "required": [
-                    "network"
-                  ],
+                  "required": ["network"],
                   "additionalProperties": false,
                   "properties": {
                     "network": {
@@ -157,9 +153,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "name"
-            ],
+            "required": ["name"],
             "additionalProperties": false,
             "properties": {
               "name": {
@@ -171,19 +165,12 @@
               },
               "kind": {
                 "type": "string",
-                "enum": [
-                  "host",
-                  "container",
-                  "vm"
-                ],
+                "enum": ["host", "container", "vm"],
                 "description": "host: the device's operating system; container, vm: an isolated environment on it"
               },
               "network": {
                 "type": "string",
-                "enum": [
-                  "host",
-                  "own"
-                ],
+                "enum": ["host", "own"],
                 "description": "host (default): shares the device's network namespace, loopback included; own: has its own network namespace and address"
               },
               "shared_memory": {
@@ -270,23 +257,16 @@
       },
       "oneOf": [
         {
-          "required": [
-            "link"
-          ]
+          "required": ["link"]
         },
         {
-          "required": [
-            "bus"
-          ]
+          "required": ["bus"]
         }
       ]
     },
     "time_sync": {
       "type": "object",
-      "required": [
-        "name",
-        "grandmaster"
-      ],
+      "required": ["name", "grandmaster"],
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -350,41 +330,27 @@
       },
       "oneOf": [
         {
-          "required": [
-            "compute_unit",
-            "environment"
-          ],
+          "required": ["compute_unit", "environment"],
           "not": {
             "anyOf": [
               {
-                "required": [
-                  "peripheral"
-                ]
+                "required": ["peripheral"]
               },
               {
-                "required": [
-                  "device"
-                ]
+                "required": ["device"]
               }
             ]
           }
         },
         {
-          "required": [
-            "peripheral",
-            "device"
-          ],
+          "required": ["peripheral", "device"],
           "not": {
             "anyOf": [
               {
-                "required": [
-                  "compute_unit"
-                ]
+                "required": ["compute_unit"]
               },
               {
-                "required": [
-                  "environment"
-                ]
+                "required": ["environment"]
               }
             ]
           }
@@ -393,9 +359,7 @@
     },
     "part": {
       "type": "object",
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -406,9 +370,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "name"
-            ],
+            "required": ["name"],
             "additionalProperties": false,
             "properties": {
               "name": {
@@ -446,6 +408,19 @@
                   }
                 ]
               },
+              "data_rate": {
+                "description": "Data the device sends on the interface in bit/s: an integer, or a number with suffix k, M or G (e.g. 300M)",
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[0-9]+(\\.[0-9]+)?[kMG]?$"
+                  }
+                ]
+              },
               "network": {
                 "type": "string",
                 "description": "Name of a declared network"
@@ -458,9 +433,7 @@
                 "type": "array",
                 "items": {
                   "type": "object",
-                  "required": [
-                    "network"
-                  ],
+                  "required": ["network"],
                   "additionalProperties": false,
                   "properties": {
                     "network": {
@@ -482,9 +455,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "name"
-            ],
+            "required": ["name"],
             "additionalProperties": false,
             "properties": {
               "name": {
@@ -496,19 +467,12 @@
               },
               "kind": {
                 "type": "string",
-                "enum": [
-                  "host",
-                  "container",
-                  "vm"
-                ],
+                "enum": ["host", "container", "vm"],
                 "description": "host: the device's operating system; container, vm: an isolated environment on it"
               },
               "network": {
                 "type": "string",
-                "enum": [
-                  "host",
-                  "own"
-                ],
+                "enum": ["host", "own"],
                 "description": "host (default): shares the device's network namespace, loopback included; own: has its own network namespace and address"
               },
               "shared_memory": {
@@ -609,36 +573,28 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "name"
-            ]
+            "required": ["name"]
           }
         },
         "devices": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "name"
-            ]
+            "required": ["name"]
           }
         },
         "connections": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "name"
-            ]
+            "required": ["name"]
           }
         },
         "time_sync": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "name"
-            ]
+            "required": ["name"]
           }
         },
         "bindings": {
@@ -647,14 +603,10 @@
             "type": "object",
             "oneOf": [
               {
-                "required": [
-                  "compute_unit"
-                ]
+                "required": ["compute_unit"]
               },
               {
-                "required": [
-                  "peripheral"
-                ]
+                "required": ["peripheral"]
               }
             ]
           }
@@ -700,15 +652,10 @@
   "additionalProperties": false,
   "if": {
     "not": {
-      "required": [
-        "base"
-      ]
+      "required": ["base"]
     }
   },
   "then": {
-    "required": [
-      "devices",
-      "bindings"
-    ]
+    "required": ["devices", "bindings"]
   }
 }

@@ -2,13 +2,15 @@ autoware_system_design_format: 0.5.0
 
 name: TypeAlphaLocalPair.ee_architecture
 
-description: TypeAlphaBridge without ecu_b; map_localization runs in a second container of ecu_a.
+description: TypeAlphaBridge without ecu_b; map_localization runs in a second container of ecu_a, which takes over the CAN bus.
 
 base: TypeAlphaBridge.ee_architecture
 
 remove:
   devices:
     - name: ecu_b
+  connections:
+    - name: ecu_b_vehicle
 
 override:
   devices:
@@ -16,8 +18,19 @@ override:
       hardware: x86_64
       interfaces:
         - name: eth0
+          bitrate: 1G
           network: vehicle
           address: 172.30.87.11
+        - name: eth1
+          bitrate: 10G
+          network: sensor
+          address: 172.30.88.1
+        - name: gmsl0
+          type: gmsl
+          bitrate: 6G
+        - name: can0
+          type: can
+          bitrate: 500k
       environments:
         - name: sensing_perception
           kind: container
@@ -27,6 +40,9 @@ override:
           kind: container
           shared_memory: true
           daemon_port: 8782
+  connections:
+    - name: vehicle_can
+      bus: [ecu_a.can0, vcu.can0]
   main_environment: ecu_a/sensing_perception
   bindings:
     - compute_unit: sensing_perception

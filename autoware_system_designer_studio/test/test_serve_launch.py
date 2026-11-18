@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 
 from autoware_system_designer_runtime import run_log
-from autoware_system_designer_studio.serve import api, jobs, launch, runs
+from autoware_system_designer_studio.serve import api, architecture, jobs, launch, runs
 
 from .test_serve import PKG, SYSTEM, UNITS, _await_job_output, _install_tree, _Running
 from .test_serve_jobs import _wait_job
@@ -907,3 +907,22 @@ def test_a_monitor_snapshot_far_over_64_kib_keeps_the_channel(launching):
     status, body = launching.rpc({"method": "measure.status", "params": {"compute_unit": "main_ecu"}})
     assert status == 200  # still connected
     launching.rpc({"method": "launch.shutdown", "params": {"compute_unit": "main_ecu"}})
+
+
+def test_launch_refuses_a_deploy_built_for_another_architecture(tmp_path, run_dir):
+    install = _install_tree(tmp_path, compute_units=UNITS)
+    manifest_path = next(install.rglob("deployment.json"))
+    manifest = json.loads(manifest_path.read_text())
+    manifest["deploy_variants"][0]["ee_architecture"] = "Bench"
+    manifest_path.write_text(json.dumps(manifest))
+    running = _Running(
+        install, served_units=["main_ecu"], launch_env=_launch_env(_fake_launcher(tmp_path)), heartbeat_s=60
+    )
+    try:
+        running.daemon.environment = architecture.EnvironmentBinding("Other", "ecu/host", True, None, ("main_ecu",), ())
+        status, body = _start(running, deploy="car_a")
+        assert body["error"]["code"] == api.INVALID_PARAMS, body
+        assert "for E/E architecture 'Bench'" in body["error"]["message"]
+        assert running.daemon.launch.sessions == {}
+    finally:
+        running.close()

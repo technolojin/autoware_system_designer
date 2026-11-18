@@ -1,4 +1,4 @@
-autoware_system_design_format: 0.4.1
+autoware_system_design_format: 0.5.0
 
 name: Tracker.node
 
@@ -32,6 +32,7 @@ subscribers:
 publishers:
   - name: objects
     message_type: std_msgs/msg/Int64MultiArray
+    message_size: 20k
     qos:
       reliability: reliable
       durability: transient_local

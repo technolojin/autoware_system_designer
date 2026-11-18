@@ -21,19 +21,23 @@ synchronization domains, and binds each compute unit of a system to one
 environment and each peripheral to one device. Resolution checks the
 description against the system, expands composite devices into their parts,
 and derives what export consumers read: one record per environment, the
-wiring, the path of every synchronized interface to its grandmaster, and the
-interfaces and addresses a peripheral is reached by.
+wiring, the path of every synchronized interface to its grandmaster, the
+interfaces and addresses a peripheral is reached by with the node parameter
+values they give, and per mode the data flows into and out of each compute
+unit with the load they put on each connection.
 """
 
 from __future__ import annotations
 
 import ipaddress
 import logging
+import re
 from collections import deque
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 from autoware_system_designer.builder.modes import apply_mode_configuration, select_modes
 from autoware_system_designer.common.exceptions import ValidationError
+from autoware_system_designer.common.quantity import parse_scaled
 from autoware_system_designer.common.source_location import format_source, source_from_config
 from autoware_system_designer.model.config import DeviceConfig, EeArchitectureConfig, SystemConfig
 
@@ -45,7 +49,8 @@ KIND_ONBOARD = "onboard"
 CARRIES_DAEMON = "daemon"
 DEFAULT_INTERFACE_TYPE = "ethernet"
 FORWARDING_ROLES = ("switch", "router")
-BITRATE_SUFFIX = {"k": 10**3, "M": 10**6, "G": 10**9}
+KIND_BUS = "bus"
+BITS_PER_BYTE = 8
 
 # (device id, interface name); the interface is None for an unspecified port of a forwarding device.
 Node = Tuple[str, Optional[str]]
@@ -53,14 +58,8 @@ DeviceLookup = Callable[[str], DeviceConfig]
 
 
 def parse_bitrate(value: Any) -> Optional[int]:
-    """Capacity in bit/s of an integer or a suffixed number such as 500k or 10G."""
-    if value is None:
-        return None
-    if isinstance(value, int):
-        return value
-    text = str(value)
-    scale = BITRATE_SUFFIX.get(text[-1])
-    return int(float(text[:-1]) * scale) if scale else int(float(text))
+    """Rate in bit/s of an integer or a suffixed number such as 500k or 10G."""
+    return parse_scaled(value)
 
 
 def _duplicates(names: Iterable[Any]) -> List[Any]:
@@ -125,6 +124,107 @@ def cross_unit_pairs(system_config: SystemConfig) -> Set[Tuple[str, str]]:
             )
             pairs.update((a, b) for i, a in enumerate(units) for b in units[i + 1 :])
     return pairs
+
+
+def _component_path(component: Dict[str, Any]) -> str:
+    """Instance path of a top-level component: its `path`, else its name under the root."""
+    path = (component.get("path") or "").strip()
+    return "/" + (path.strip("/") if path else component.get("name", ""))
+
+
+def _under(path: str, prefix: str) -> bool:
+    return prefix == "/" or path == prefix or path.startswith(prefix.rstrip("/") + "/")
+
+
+def node_component(system_config: SystemConfig, node: str) -> Optional[str]:
+    """Top-level component the node path lies in, over all modes of the system; the deepest one."""
+    mode_names, _ = select_modes(system_config)
+    found: Dict[str, str] = {}
+    for mode_name in mode_names:
+        for component in apply_mode_configuration(system_config, mode_name).components or []:
+            if isinstance(component, dict) and component.get("name"):
+                path = _component_path(component)
+                if _under(node, path):
+                    found.setdefault(component["name"], path)
+    return max(found, key=lambda name: len(found[name])) if found else None
+
+
+def peripheral_argument(peripheral: str, parameter: str) -> str:
+    """System argument a node parameter of a peripheral is bound by at launch."""
+    return re.sub(r"[^a-z0-9_]", "_", f"{peripheral}_{parameter}".lower())
+
+
+def peripheral_arguments(peripherals: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    """Node parameters the peripherals of a system take from an E/E architecture, each with its argument."""
+    arguments = []
+    for peripheral in peripherals or []:
+        for parameter in peripheral.get("parameters") or []:
+            arguments.append(
+                {
+                    "argument": peripheral_argument(peripheral["name"], parameter["name"]),
+                    "peripheral": peripheral["name"],
+                    "node": peripheral.get("node"),
+                    "parameter": parameter["name"],
+                    "value": parameter["value"],
+                }
+            )
+    return arguments
+
+
+def _unit_of_port(children: List[Dict[str, Any]]) -> Callable[[str], Optional[str]]:
+    """Compute unit of a port path: the unit of the deepest top-level component containing it."""
+    roots = sorted(
+        ((child.get("path") or "", child.get("compute_unit")) for child in children if child.get("path")),
+        key=lambda item: -len(item[0]),
+    )
+
+    def unit_of(port_path: str) -> Optional[str]:
+        return next((unit for path, unit in roots if _under(port_path, path)), None)
+
+    return unit_of
+
+
+def _publish_rates(instance: Dict[str, Any], rates: Dict[str, float]) -> Dict[str, float]:
+    """Rate of each topic, from the output event of the node port that publishes it."""
+    if instance.get("entity_type") == "node":
+        for port in instance.get("out_ports") or []:
+            frequency = (port.get("event") or {}).get("frequency")
+            if frequency and port.get("topic"):
+                rates.setdefault("/" + "/".join(port["topic"]), frequency)
+    for child in instance.get("children") or []:
+        _publish_rates(child, rates)
+    return rates
+
+
+def topic_flows(structure: Dict[str, Any]) -> Dict[Tuple[str, str], List[Dict[str, Any]]]:
+    """Topics of one mode's system structure published on one compute unit and subscribed on another.
+
+    Keyed by (publishing unit, subscribing unit); a topic counts once per pair however many nodes subscribe.
+    """
+    unit_of = _unit_of_port(structure.get("children") or [])
+    rates = _publish_rates(structure, {})
+    flows: Dict[Tuple[str, str], Dict[str, Dict[str, Any]]] = {}
+    for link in structure.get("links") or []:
+        source, target = link.get("from_port") or {}, link.get("to_port") or {}
+        if (source.get("role") or "publisher") != "publisher":
+            continue
+        pair = (unit_of(source.get("port_path", "")), unit_of(target.get("port_path", "")))
+        if None in pair or pair[0] == pair[1]:
+            continue
+        topic = link.get("topic") or ""
+        frequency = rates.get(topic) or (source.get("event") or {}).get("frequency")
+        size = source.get("message_size")
+        flows.setdefault(pair, {}).setdefault(
+            topic,
+            {
+                "topic": topic,
+                "msg_type": link.get("msg_type"),
+                "frequency": frequency or None,
+                "message_size": size,
+                "bitrate": int(frequency * size * BITS_PER_BYTE) if frequency and size else None,
+            },
+        )
+    return {pair: list(topics.values()) for pair, topics in flows.items()}
 
 
 class _Resolver:
@@ -279,6 +379,7 @@ class _Resolver:
                     "name": interface["name"],
                     "type": interface.get("type", DEFAULT_INTERFACE_TYPE),
                     "bitrate": parse_bitrate(interface.get("bitrate")),
+                    "data_rate": parse_bitrate(interface.get("data_rate")),
                     "description": interface.get("description", ""),
                     "attachments": attachments,
                 }
@@ -415,25 +516,32 @@ class _Resolver:
             return [node]
         return [other for other in self.connections_of if other[0] == device]
 
-    def _path(self, sources: List[Node], reached: Callable[[Node], bool]) -> Optional[Tuple[Node, Node, List[str]]]:
-        """Shortest chain of connections from one of the source interfaces to an interface that satisfies reached."""
+    def _path(
+        self, sources: List[Node], reached: Callable[[Node], bool], types: Optional[Set[str]] = None
+    ) -> Optional[Tuple[Node, Node, List[str], List[Tuple[int, str]]]]:
+        """Shortest chain of connections, of the given types when set, from one of the source interfaces to an
+        interface that satisfies reached.
+
+        Returns the source and reached interfaces, the connection ids, and per connection its index with the
+        device the data enters it from.
+        """
         queue = deque((source, source, None, []) for source in sources)
         seen: Set[Node] = set(sources)
         while queue:
-            source, node, via, path = queue.popleft()
+            source, node, via, hops = queue.popleft()
             exits = [node] if via is None else self._exits(node)
             for exit_node in exits:
                 for index in self.connections_of.get(exit_node, []):
-                    if index == via:
+                    if index == via or (types is not None and self.connections[index]["type"] not in types):
                         continue
                     for other in self.connections[index]["endpoints"]:
                         target = (other["device"], other["interface"])
                         if target == exit_node or target in seen:
                             continue
                         seen.add(target)
-                        step = [*path, self.connections[index]["id"]]
+                        step = [*hops, (index, exit_node[0])]
                         if reached(target):
-                            return source, target, step
+                            return source, target, [self.connections[i]["id"] for i, _ in step], step
                         queue.append((source, target, index, step))
         return None
 
@@ -485,19 +593,23 @@ class _Resolver:
         environment = self.environment_of[unit]
         host_device = environment["device"]
         own = self.devices[host_device]["interfaces"]
-        pairs: List[Tuple[Dict[str, Any], Dict[str, Any], Optional[List[str]]]] = []
+        pairs: List[Tuple[Dict[str, Any], Dict[str, Any], Optional[Tuple]]] = []
         if self.wired:
             for peer in self.devices[device]["interfaces"]:
                 target = (device, peer["name"])
                 if not self._terminal(target):
                     continue
+                # Routed from the peripheral, the direction its data flows in.
                 found = [
-                    (candidate, self._path([(host_device, candidate["name"])], lambda node, t=target: node == t))
+                    (
+                        candidate,
+                        self._path([target], lambda node, h=(host_device, candidate["name"]): node == h),
+                    )
                     for candidate in own
                 ]
-                reaching = [(candidate, path[2]) for candidate, path in found if path is not None]
+                reaching = [(candidate, path) for candidate, path in found if path is not None]
                 if reaching:
-                    best = min(reaching, key=lambda c: (self._shared_network(c[0], peer)[0] is None, len(c[1])))
+                    best = min(reaching, key=lambda c: (self._shared_network(c[0], peer)[0] is None, len(c[1][2])))
                     pairs.append((best[0], peer, best[1]))
             if not pairs:
                 raise self.fail(
@@ -514,6 +626,9 @@ class _Resolver:
         hosts = []
         for candidate, peer, path in pairs:
             network, address = self._shared_network(candidate, peer)
+            peer_address = next(
+                (a["address"] for a in peer["attachments"] if network is not None and a["network"] == network), None
+            )
             hosts.append(
                 {
                     "compute_unit": unit,
@@ -521,17 +636,67 @@ class _Resolver:
                     "device": host_device,
                     "interface": candidate["name"],
                     "peer_interface": peer["name"],
+                    "peer_address": peer_address,
                     "network": network,
                     "address": address,
-                    "path": path,
+                    "data_rate": peer["data_rate"],
+                    "path": None if path is None else path[2][::-1],
+                    "hops": None if path is None else path[3],
                 }
             )
         return hosts
 
+    def _parameter_values(self, name: str, device: str, hosts: List[Dict[str, Any]], parameters: List[Dict[str, Any]]):
+        """Value of each node parameter of a peripheral, from the first interface each compute unit reaches it by.
+
+        A value differing between the compute units of the node fails: the node takes one value per architecture.
+        """
+        values = []
+        firsts = {}
+        for host in hosts:
+            firsts.setdefault(host["compute_unit"], host)
+        for parameter in parameters:
+            found = set()
+            for host in firsts.values():
+                found.add(
+                    {
+                        "address": host["peer_address"],
+                        "interface": host["peer_interface"],
+                        "network": host["network"],
+                        "host_address": host["address"],
+                        "host_interface": host["interface"],
+                        "device": device,
+                    }[parameter["value"]]
+                )
+            if not found or None in found:
+                raise self.fail(
+                    f"peripheral '{name}' gives parameter '{parameter['name']}' its {parameter['value']}, which "
+                    f"device '{device}' has none of on the way to the node's compute unit"
+                )
+            if len(found) > 1:
+                raise self.fail(
+                    f"peripheral '{name}' gives parameter '{parameter['name']}' different values {sorted(found)} on "
+                    f"the compute units of its node"
+                )
+            values.append(
+                {
+                    "name": parameter["name"],
+                    "value": parameter["value"],
+                    "argument": peripheral_argument(name, parameter["name"]),
+                    "resolved": found.pop(),
+                }
+            )
+        return values
+
     def bind_peripherals(
-        self, peripherals: List[Dict[str, Any]], units_of: Dict[str, List[str]], system_name: str
+        self,
+        peripherals: List[Dict[str, Any]],
+        units_of: Dict[str, List[str]],
+        system_name: str,
+        component_of: Callable[[str], Optional[str]],
     ) -> List[Dict[str, Any]]:
-        """Device of every peripheral of the system, with the interfaces its component's units reach it by."""
+        """Device of every peripheral of the system, with the interfaces its component's units reach it by and the
+        values its node takes."""
         declared = self._named(peripherals, "peripheral", f"system '{system_name}'")
         bindings = [b for b in self.architecture.bindings or [] if "peripheral" in b]
         repeated = _duplicates(binding["peripheral"] for binding in bindings)
@@ -544,28 +709,143 @@ class _Resolver:
                 raise self.fail(f"binds '{name}', which is no peripheral of system '{system_name}' {sorted(declared)}")
             if device not in self.devices:
                 raise self.fail(f"binds peripheral '{name}' to undeclared device '{device}' {sorted(self.devices)}")
+            node = declared[name].get("node")
             component = declared[name].get("component")
+            if component is None and node is not None:
+                component = component_of(node)
+                if component is None:
+                    raise self.fail(
+                        f"peripheral '{name}' names node '{node}', which no component of '{system_name}' holds"
+                    )
             if component is not None and component not in units_of:
                 raise self.fail(f"peripheral '{name}' names '{component}', which is no component of '{system_name}'")
             units = [unit for unit in units_of.get(component, []) if unit in self.environment_of]
+            hosts = [host for unit in units for host in self._hosts(unit, device, name)]
             records.append(
                 {
                     "name": name,
                     "device": device,
                     "component": component,
+                    "node": node,
                     "description": declared[name].get("description", ""),
                     "addresses": [
                         {"interface": interface["name"], **attachment}
                         for interface in self.devices[device]["interfaces"]
                         for attachment in interface["attachments"]
                     ],
-                    "hosts": [host for unit in units for host in self._hosts(unit, device, name)],
+                    "hosts": hosts,
+                    "parameters": self._parameter_values(name, device, hosts, declared[name].get("parameters") or []),
                 }
             )
         unbound = sorted(set(declared) - {binding["peripheral"] for binding in bindings})
         if unbound:
             raise self.fail(f"peripheral(s) {unbound} of system '{system_name}' are bound to no device")
         return records
+
+    # ---- data flows
+
+    def _route(self, first: str, second: str) -> Optional[Tuple[List[str], List[Tuple[int, str]]]]:
+        """Ethernet connections topic data takes from one device to another: none within a device, None when no
+        path joins them."""
+        if first == second:
+            return [], []
+        if not self.wired:
+            return None
+        sources = [
+            (first, i["name"]) for i in self.devices[first]["interfaces"] if (first, i["name"]) in self.connections_of
+        ]
+        found = self._path(sources, lambda node: node[0] == second, {DEFAULT_INTERFACE_TYPE})
+        return None if found is None else (found[2], found[3])
+
+    def analyze(self, peripherals: List[Dict[str, Any]], structures: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Per mode, the flows into and out of the compute units, one per peripheral and unit and one per ordered
+        pair of units, and the load they put on each connection.
+
+        A link carries each direction on its own, so its load is that of its busiest direction; a bus shares
+        its capacity among all senders.
+        """
+        analysis: Dict[str, Any] = {}
+        for mode, structure in structures.items():
+            flows: List[Dict[str, Any]] = []
+            # Per flow, the routes that carry data with the rate on each.
+            carriers: List[List[Tuple[List[Tuple[int, str]], int]]] = []
+            for peripheral in peripherals:
+                by_unit: Dict[str, List[Dict[str, Any]]] = {}
+                for host in peripheral["hosts"]:
+                    by_unit.setdefault(host["compute_unit"], []).append(host)
+                for unit, hosts in by_unit.items():
+                    rates = [host["data_rate"] for host in hosts if host["data_rate"]]
+                    flows.append(
+                        {
+                            "id": f"f{len(flows)}",
+                            "kind": "peripheral",
+                            "source": {"kind": "peripheral", "name": peripheral["name"]},
+                            "target": {"kind": "compute_unit", "name": unit},
+                            "node": peripheral["node"],
+                            "bitrate": sum(rates) if rates else None,
+                            "unrated": 0 if rates else 1,
+                            "routes": [host["path"] for host in hosts if host["path"] is not None],
+                        }
+                    )
+                    carriers.append(
+                        [(host["hops"], host["data_rate"]) for host in hosts if host["data_rate"] and host["hops"]]
+                    )
+            for (first, second), topics in sorted(topic_flows(structure).items()):
+                if first not in self.environment_of or second not in self.environment_of:
+                    continue
+                route = self._route(self.environment_of[first]["device"], self.environment_of[second]["device"])
+                rates = [topic["bitrate"] for topic in topics if topic["bitrate"]]
+                flows.append(
+                    {
+                        "id": f"f{len(flows)}",
+                        "kind": "topics",
+                        "source": {"kind": "compute_unit", "name": first},
+                        "target": {"kind": "compute_unit", "name": second},
+                        "topics": sorted(topics, key=lambda topic: topic["topic"]),
+                        "bitrate": sum(rates) if rates else None,
+                        "unrated": len(topics) - len(rates),
+                        "routes": [] if route is None else [route[0]],
+                        "local": route is not None and not route[0],
+                    }
+                )
+                carriers.append([(route[1], sum(rates))] if route and rates else [])
+
+            load: Dict[int, Dict[Optional[str], int]] = {}
+            carried: Dict[int, List[str]] = {}
+            for flow, routes in zip(flows, carriers):
+                for hops, rate in routes:
+                    for index, sender in hops:
+                        key = None if self.connections[index]["kind"] == KIND_BUS else sender
+                        directions = load.setdefault(index, {})
+                        directions[key] = directions.get(key, 0) + rate
+                        if flow["id"] not in carried.setdefault(index, []):
+                            carried[index].append(flow["id"])
+            loads = []
+            for index in sorted(load):
+                connection = self.connections[index]
+                busiest = max(load[index].values())
+                capacity = connection["bitrate"]
+                utilization = busiest / capacity if capacity else None
+                loads.append(
+                    {
+                        "connection": connection["id"],
+                        "load": busiest,
+                        "capacity": capacity,
+                        "utilization": utilization,
+                        "directions": [
+                            {"from": sender, "load": rate} for sender, rate in sorted(load[index].items(), key=str)
+                        ],
+                        "flows": carried[index],
+                    }
+                )
+                if utilization is not None and utilization > 1:
+                    label = connection["name"] or connection["id"]
+                    logger.warning(
+                        f"E/E architecture '{self.architecture.name}', mode '{mode}': connection '{label}' carries "
+                        f"{busiest} bit/s, over its capacity of {capacity} bit/s{self.source}"
+                    )
+            analysis[mode] = {"flows": flows, "loads": loads}
+        return analysis
 
     # ---- time synchronization
 
@@ -695,7 +975,10 @@ class _Resolver:
 
 
 def resolve_ee_architecture(
-    architecture: EeArchitectureConfig, system_config: SystemConfig, device_lookup: Optional[DeviceLookup] = None
+    architecture: EeArchitectureConfig,
+    system_config: SystemConfig,
+    device_lookup: Optional[DeviceLookup] = None,
+    structures: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Check an E/E architecture against a system and return its export record.
 
@@ -707,6 +990,7 @@ def resolve_ee_architecture(
     of its component's units and each time sync member to its grandmaster.
 
     device_lookup returns the device entity of a name, for instances that are of one.
+    structures holds the built system structure of each mode, whose cross-unit topics the analysis reads.
     """
     resolver = _Resolver(architecture, device_lookup)
     resolver.read_networks()
@@ -714,10 +998,17 @@ def resolve_ee_architecture(
     resolver.read_connections()
     resolver.bind(system_units(system_config), system_requirements(system_config), system_config.name)
     peripherals = resolver.bind_peripherals(
-        system_config.peripherals or [], component_units(system_config), system_config.name
+        system_config.peripherals or [],
+        component_units(system_config),
+        system_config.name,
+        lambda node: node_component(system_config, node),
     )
     time_sync = resolver.time_sync()
     main = resolver.check_daemons()
+    analysis = resolver.analyze(peripherals, structures or {})
+    for peripheral in peripherals:
+        for host in peripheral["hosts"]:
+            host.pop("hops")
     for warning in resolver.warn_shared_memory(cross_unit_pairs(system_config)):
         logger.warning(warning)
     return {
@@ -731,4 +1022,5 @@ def resolve_ee_architecture(
         "wiring": {"devices": list(resolver.devices.values()), "connections": resolver.connections},
         "time_sync": time_sync,
         "peripherals": peripherals,
+        "analysis": analysis,
     }

@@ -32,6 +32,47 @@ compute_units:
   - name: planning_control
     description: Planning and control.
 
+peripherals:
+  - name: lidar_top
+    node: /sensing/lidar/lidar_top
+    parameters:
+      - name: sensor_ip
+        value: address
+      - name: host_ip
+        value: host_address
+  - name: lidar_left
+    node: /sensing/lidar/lidar_left
+    parameters:
+      - name: sensor_ip
+        value: address
+      - name: host_ip
+        value: host_address
+  - name: lidar_right
+    node: /sensing/lidar/lidar_right
+    parameters:
+      - name: sensor_ip
+        value: address
+      - name: host_ip
+        value: host_address
+  - name: lidar_rear
+    node: /sensing/lidar/lidar_rear
+    parameters:
+      - name: sensor_ip
+        value: address
+      - name: host_ip
+        value: host_address
+  - name: camera_front
+    node: /sensing/camera/camera_0
+    parameters:
+      - name: device
+        value: host_interface
+  - name: vehicle_controller
+    description: Drive-by-wire controller the vehicle interface commands.
+    node: /vehicle
+    parameters:
+      - name: can_interface
+        value: host_interface
+
 components:
   - name: sensing
     entity: SensingDummy.module
