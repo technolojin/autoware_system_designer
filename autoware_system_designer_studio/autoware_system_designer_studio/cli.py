@@ -262,13 +262,27 @@ def _install_root(args: argparse.Namespace) -> Path:
     return install_root
 
 
+def _serve_binding(args: argparse.Namespace, install_root: Path) -> Optional[architecture.EnvironmentBinding]:
+    """The daemon's place in its E/E architecture; one the exports cannot give warns and the daemon runs without."""
+    try:
+        return _environment_binding(args, install_root)
+    except SystemExit as exc:
+        logger.warning(f"serving without an E/E architecture: {exc.code}")
+        return None
+
+
 def _run_serve(args: argparse.Namespace) -> None:
     install_root = _install_root(args)
-    binding = _environment_binding(args, install_root)
+    binding = _serve_binding(args, install_root)
     port = _port(args, binding)
     served_units = args.compute_units
     if binding is None:
-        peer_specs = args.peer_specs
+        try:
+            peer_specs = (
+                args.peer_specs if args.ee_architecture is None else _peer_specs(args, (), served_units or (), port)
+            )
+        except peers.PeerConfigError as exc:
+            sys.exit(str(exc))
     else:
         if served_units is None:
             served_units = list(binding.units)
