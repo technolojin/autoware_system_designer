@@ -557,7 +557,8 @@ autoware-system-designer-studio serve --ee-architecture TypeAlphaBridge --enviro
 The same two names come from the site file (`ee_architecture`, `environment`), which the flags
 replace. `--port`, `--compute-unit`, `--peer` and `--peer-ssh` and the site file's `peers` replace
 what the architecture gives, unit by unit. Without an architecture the daemon serves every onboard
-unit, or the ones `--compute-unit` names. `health` reports the place under `ee_architecture`
+unit, or the ones `--compute-unit` names; an architecture or environment the exports do not hold
+warns and the daemon runs without one. `health` reports the place under `ee_architecture`
 (`name`, `environment`, `main`, `port`, `compute_units`, `peers`), and
 
 ```bash

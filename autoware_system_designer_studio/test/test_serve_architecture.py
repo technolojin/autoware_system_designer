@@ -16,6 +16,7 @@
 """A daemon's units, port and peers from an E/E architecture and its environment."""
 
 import json
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -163,3 +164,19 @@ def test_environment_command_prints_the_architecture_without_an_environment(tmp_
     }
     with pytest.raises(SystemExit, match="no exported system is declared"):
         cli.main(["environment", "--install-root", str(install), "--ee-architecture", "Other"])
+
+
+def test_serve_without_the_architecture_in_the_exports_warns_and_runs_without(tmp_path, monkeypatch):
+    monkeypatch.delenv(peers.SITE_FILE_ENV, raising=False)
+    install = _install(tmp_path)
+    records = []
+    handler = logging.Handler(logging.WARNING)
+    handler.emit = records.append
+    logger = logging.getLogger("autoware_system_designer.studio")
+    logger.addHandler(handler)
+    try:
+        args = cli._parse_args(["serve", "--ee-architecture", "Other", "--environment", "ecu_a/main"])
+        assert cli._serve_binding(args, install) is None
+    finally:
+        logger.removeHandler(handler)
+    assert any("serving without an E/E architecture" in record.getMessage() for record in records)
