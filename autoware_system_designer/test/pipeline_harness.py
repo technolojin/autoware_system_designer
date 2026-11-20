@@ -39,8 +39,6 @@ _DESIGN_TYPE_BY_SUFFIX = {
     ".module.yaml": "module",
     ".system.yaml": "system",
     ".parameter_set.yaml": "parameter_set",
-    ".ee_architecture.yaml": "ee_architecture",
-    ".device.yaml": "device",
 }
 
 

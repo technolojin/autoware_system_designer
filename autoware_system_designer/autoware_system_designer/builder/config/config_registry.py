@@ -37,6 +37,7 @@ from autoware_system_designer.common.exceptions import (
 from autoware_system_designer.common.path_utils import canonical_path
 from autoware_system_designer.common.source_location import SourceLocation, format_source, source_from_config
 from autoware_system_designer.model.config import (
+    EXPERIMENTAL_FILE_SUFFIXES,
     Config,
     ConfigSubType,
     ConfigType,
@@ -261,6 +262,7 @@ class ConfigRegistry:
 
         for file_path in config_yaml_file_paths:
             logger.debug(f"Loading entity from: {file_path}")
+            experimental = str(file_path).endswith(EXPERIMENTAL_FILE_SUFFIXES)
 
             # ── format-version gate ──────────────────────────────────
             try:
@@ -274,6 +276,9 @@ class ConfigRegistry:
                 if not ver_result.compatible:
                     # Major version mismatch → stop immediately
                     src = SourceLocation(file_path=Path(file_path))
+                    if experimental:
+                        logger.warning(f"Skipping E/E design file: {ver_result.message}{format_source(src)}")
+                        continue
                     raise FormatVersionError(f"{ver_result.message}{format_source(src)}")
                 if ver_result.minor_newer:
                     # Minor version newer than tool → warn and track
@@ -309,6 +314,9 @@ class ConfigRegistry:
 
             except Exception as e:
                 src = SourceLocation(file_path=Path(file_path))
+                if experimental:
+                    logger.warning(f"Skipping E/E design file that fails to load: {e}{format_source(src)}")
+                    continue
                 error = annotate_error(e, f"loading design file {file_path}", src)
                 # Newer-minor files loaded so far may be related to the failure.
                 if self.minor_version_mismatch_files:

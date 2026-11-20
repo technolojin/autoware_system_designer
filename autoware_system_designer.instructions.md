@@ -19,8 +19,8 @@ Follow this directory structure for consistency (not mandatory).
 - **Modules**: `src/<package_name>/design/module/` (suffix: `.module.yaml`)
 - **Systems**: `src/<package_name>/design/system/` (suffix: `.system.yaml`)
 - **Parameter Sets**: `src/<package_name>/design/parameter_set/` (suffix: `.parameter_set.yaml`)
-- **E/E Architectures**: `src/<package_name>/design/ee_architecture/` (suffix: `.ee_architecture.yaml`)
-- **Devices**: `src/<package_name>/design/device/` (suffix: `.device.yaml`)
+- **E/E Architectures**: `src/<package_name>/design/ee_architecture/` (suffix: `.ee_architecture.yaml`), in the package of the deployments table
+- **Devices**: `src/<package_name>/design/device/` (suffix: `.device.yaml`), in the package of the deployments table
 
 ## 4. Configuration Entities & Schemas
 
@@ -270,7 +270,7 @@ Overrides parameters for specific nodes within the system hierarchy.
 
 ### 4.5. E/E Architecture Configuration (`.ee_architecture.yaml`)
 
-> **Experimental.** The E/E architecture (`.ee_architecture.yaml`, `.device.yaml`, and `peripherals` and compute unit `requires` in a system) is under development. Its format is not fixed and has no JSON schema; only what the build resolves is checked.
+> **Experimental.** The E/E architecture (`.ee_architecture.yaml`, `.device.yaml`, and `peripherals` and compute unit `requires` in a system) is under development. Its format is not fixed and has no JSON schema. A failure in it warns and never fails a build or lint: a design file that fails to load is skipped, an architecture that fails to resolve is left out of the export, and a deploy whose architecture is missing binds the peripheral arguments by hand. A daemon launching a deploy of another architecture warns.
 
 Describes the hardware a system is deployed on: device instances with their interfaces, the connections between interfaces, the networks addressed over them, time synchronization, and the binding of each compute unit to an execution environment and of each peripheral to a device. A system design names compute units and peripherals only; an E/E architecture names devices, compute units and peripherals only, never components. The same system runs on another architecture without a change to its design. Addresses, interface names and ports of the hardware belong here, not in node parameters.
 **Fields:**
@@ -325,7 +325,7 @@ Describes the hardware a system is deployed on: device instances with their inte
   - `compute_unit` + `environment`: Name of an `onboard` compute unit and the `<device>/<environment>` it is launched in. Several units may share one environment. The build fails when the environment does not provide a capability the unit requires.
   - `peripheral` + `device`: Name of a peripheral of the system and the device instance it is.
 
-A deployments table lists the architectures its system is deployed on under `ee_architectures`. Each is checked against the system and exported with it. A deploy names the architecture of its vehicle with `ee_architecture`, one of the listed; the build sets the deploy's argument of every peripheral parameter from it, and a studio daemon running in another architecture refuses the deploy:
+A deployments table lists the architectures its system is deployed on under `ee_architectures`. Architectures and the devices they instantiate are local to the package of the deployments table: the build looks them up among that package's files only, not across the workspace. Each is checked against the system and exported with it. A deploy names the architecture of its vehicle with `ee_architecture`, one of the listed; the build sets the deploy's argument of every peripheral parameter from it, and a studio daemon running in another architecture warns when it launches the deploy:
 
 ```yaml
 base: TypeAlpha.system

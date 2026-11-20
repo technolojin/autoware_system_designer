@@ -64,7 +64,7 @@ from autoware_system_designer.generator.deploy_launchers import generate_deploy_
 from autoware_system_designer.generator.parameter_template_generator import ParameterTemplateGenerator
 from autoware_system_designer.generator.ros2_launcher.generate_module_launcher import generate_module_launch_file
 from autoware_system_designer.model import serde
-from autoware_system_designer.model.config import NodeConfig, SystemConfig
+from autoware_system_designer.model.config import EXPERIMENTAL_FILE_SUFFIXES, NodeConfig, SystemConfig
 from autoware_system_designer.model.export_schema import SCHEMA_VERSION
 from autoware_system_designer.parser.data_validator import split_package_qualifier
 from autoware_system_designer.parser.deployment_parser import (
@@ -272,10 +272,12 @@ class DeploymentBuilder:
         added = []
         for entry in peripheral_arguments(system_config.peripherals):
             if entry["argument"] in declared:
-                raise ValidationError(
+                logger.warning(
                     f"System {system_config.full_name} declares argument '{entry['argument']}', which parameter "
-                    f"'{entry['parameter']}' of peripheral '{entry['peripheral']}' is bound by"
+                    f"'{entry['parameter']}' of peripheral '{entry['peripheral']}' is bound by; the system's own "
+                    f"argument is kept"
                 )
+                continue
             declared.add(entry["argument"])
             added.append(
                 {
@@ -287,60 +289,96 @@ class DeploymentBuilder:
             system_config.arguments = [*(system_config.arguments or []), *added]
 
     def _resolve_ee_architectures(self, system_config: SystemConfig, artifacts: BuildArtifacts) -> None:
+        """Resolve the E/E architectures the deployments table lists; one that fails warns and is left out."""
         names = deployment_ee_architectures(self.deploy_config.deployment_file)
         duplicates = sorted({name for name in names if names.count(name) > 1})
         if duplicates:
-            raise ValidationError(
-                f"E/E architecture(s) {duplicates} are listed more than once in the deployments table"
+            logger.warning(f"E/E architecture(s) {duplicates} are listed more than once in the deployments table")
+        names = list(dict.fromkeys(name.removesuffix(EE_ARCHITECTURE_SUFFIX) for name in names))
+        local = None
+        if names:
+            local = ConfigRegistry(
+                self._local_ee_design_files(),
+                self.config_registry.package_paths,
+                self.config_registry.file_package_map,
             )
-        artifacts.ee_architectures = [
-            resolve_ee_architecture(
-                self.config_registry.get_ee_architecture(name),
-                system_config,
-                self.config_registry.get_device,
-                self._structures,
-            )
-            for name in names
+        for name in names:
+            try:
+                record = resolve_ee_architecture(
+                    local.get_ee_architecture(name),
+                    system_config,
+                    local.get_device,
+                    self._structures,
+                )
+            except Exception as exc:
+                logger.warning(f"E/E architecture '{name}' is left out of the build: {exc}")
+                continue
+            artifacts.ee_architectures.append(record)
+        self._bind_deploy_architectures(artifacts, system_config, names)
+
+    def _local_ee_design_files(self) -> List[str]:
+        """E/E architecture and device files of the package holding the deployments table.
+
+        They are local to that package, like the deployments table, and never looked up across the workspace.
+        """
+        root = self._deployment_package_root()
+        files = sorted(str(path) for suffix in EXPERIMENTAL_FILE_SUFFIXES for path in Path(root).rglob(f"*{suffix}"))
+        logger.debug(f"E/E design files of package '{root}': {files}")
+        return files
+
+    def _deployment_package_root(self) -> str:
+        """Package directory of the deployments table: the registered package containing it, else the nearest
+        directory with a package.xml, else the table's own directory."""
+        table = Path(canonical_path(self.deploy_config.deployment_file))
+        containing = [
+            Path(canonical_path(path))
+            for path in self.config_registry.package_paths.values()
+            if path and is_within(str(table), canonical_path(path))
         ]
-        self._bind_deploy_architectures(artifacts, names)
+        if containing:
+            return str(max(containing, key=lambda path: len(path.parts)))
+        for directory in table.parents:
+            if (directory / "package.xml").is_file():
+                return str(directory)
+        return str(table.parent)
 
     @staticmethod
-    def _bind_deploy_architectures(artifacts: BuildArtifacts, names: List[str]) -> None:
-        """Set the peripheral arguments of each deploy from the E/E architecture it names."""
+    def _bind_deploy_architectures(artifacts: BuildArtifacts, system_config: SystemConfig, names: List[str]) -> None:
+        """Set the peripheral arguments of each deploy from the E/E architecture it names.
+
+        A deploy naming an architecture the build has no record of keeps no architecture and binds the arguments
+        by hand; an argument the deploy sets itself keeps the deploy's value.
+        """
         records = {record["name"]: record for record in artifacts.ee_architectures}
-        bound = sorted(
-            {
-                p["argument"]
-                for record in records.values()
-                for peripheral in record["peripherals"]
-                for p in peripheral["parameters"]
-            }
-        )
+        bound = sorted({entry["argument"] for entry in peripheral_arguments(system_config.peripherals)})
         for deploy_item in artifacts.deploy_variants:
-            name = deploy_item.get("ee_architecture")
+            name = deploy_item.pop("ee_architecture", None)
+            if name is not None:
+                name = name.removesuffix(EE_ARCHITECTURE_SUFFIX)
+                if name not in records:
+                    reason = "failed to resolve" if name in names else f"the deployments table does not list {names}"
+                    logger.warning(
+                        f"Deployment '{deploy_item.get('name')}' names E/E architecture '{name}', which {reason}"
+                    )
+                    name = None
             if name is None:
                 if bound:
                     logger.warning(
-                        f"Deployment '{deploy_item.get('name')}' names no E/E architecture; its launches bind "
+                        f"Deployment '{deploy_item.get('name')}' has no E/E architecture; its launches bind "
                         f"argument(s) {bound} by hand"
                     )
                 continue
-            name = name.removesuffix(EE_ARCHITECTURE_SUFFIX)
-            if name not in records:
-                raise ValidationError(
-                    f"Deployment '{deploy_item.get('name')}' names E/E architecture '{name}', which the deployments "
-                    f"table does not list {names}"
-                )
             deploy_item["ee_architecture"] = name
             arguments = list(deploy_item.get("arguments") or [])
             deploy_item["arguments"] = arguments
             given = {argument.get("name") for argument in arguments if isinstance(argument, dict)}
             for parameter in (p for peripheral in records[name]["peripherals"] for p in peripheral["parameters"]):
                 if parameter["argument"] in given:
-                    raise ValidationError(
+                    logger.warning(
                         f"Deployment '{deploy_item.get('name')}' sets argument '{parameter['argument']}', which "
-                        f"E/E architecture '{name}' sets"
+                        f"E/E architecture '{name}' sets; the deployment's value is kept"
                     )
+                    continue
                 arguments.append({"name": parameter["argument"], "value": parameter["resolved"]})
 
     def _export_workspace_root(self) -> Optional[str]:

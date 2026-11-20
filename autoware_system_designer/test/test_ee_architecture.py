@@ -16,7 +16,9 @@
 """E/E architecture: checks of the description against a system, variants, and its export."""
 
 import logging
+from contextlib import contextmanager
 from pathlib import Path
+from typing import List
 
 import pytest
 from pipeline_harness import FIXTURES_DIR, run_pipeline, stage_case
@@ -289,11 +291,53 @@ def test_system_only_target_exports_no_architecture(tmp_path):
     assert load_build_artifacts(str(run.out_root), run.system_name).ee_architectures == []
 
 
-def test_deployment_naming_an_unknown_architecture_fails(tmp_path):
-    workspace = _stage_with_deployment(tmp_path, "[Ghost.ee_architecture]")
-    with pytest.raises(Exception) as excinfo:
-        run_pipeline(workspace, "units_pkg/multi.deployments.yaml", tmp_path)
-    assert "Ghost" in str(excinfo.value)
+@contextmanager
+def _warnings():
+    """Messages warned by the designer while the block runs."""
+    records: List[logging.LogRecord] = []
+    handler = logging.Handler(logging.WARNING)
+    handler.emit = records.append
+    # Module loggers do not propagate under ROS launch logging; each one gets the handler.
+    names = ("deploy", "builder.config.config_registry", "builder.ee_architecture", "builder.instances.instance_tree")
+    loggers = [logging.getLogger(f"autoware_system_designer.{name}") for name in names]
+    for logger in loggers:
+        logger.addHandler(handler)
+    messages: List[str] = []
+    try:
+        yield messages
+    finally:
+        for logger in loggers:
+            logger.removeHandler(handler)
+        messages.extend(record.getMessage() for record in records)
+
+
+def test_architecture_failing_to_resolve_warns_and_is_left_out(tmp_path):
+    workspace = _stage_with_deployment(tmp_path, "[Ghost.ee_architecture, Bench.ee_architecture]")
+    with _warnings() as messages:
+        run = run_pipeline(workspace, "units_pkg/multi.deployments.yaml", tmp_path)
+    assert any("E/E architecture 'Ghost' is left out of the build" in message for message in messages)
+    artifacts = load_build_artifacts(str(run.out_root), run.system_name)
+    assert [record["name"] for record in artifacts.ee_architectures] == ["Bench"]
+
+
+def test_architectures_are_looked_up_in_the_package_of_the_deployments_table_only(tmp_path):
+    workspace = _stage_with_deployment(tmp_path, "[Bench.ee_architecture, Remote.ee_architecture]")
+    other = workspace / "other_pkg"
+    other.mkdir()
+    (other / "Remote.ee_architecture.yaml").write_text(TWO_DEVICES.replace("name: Bench", "name: Remote"))
+    with _warnings() as messages:
+        run = run_pipeline(workspace, "units_pkg/multi.deployments.yaml", tmp_path)
+    assert any("E/E architecture 'Remote' is left out of the build" in message for message in messages)
+    assert [r["name"] for r in load_build_artifacts(str(run.out_root), run.system_name).ee_architectures] == ["Bench"]
+
+
+def test_broken_architecture_file_warns_and_is_skipped(tmp_path):
+    workspace = _stage_with_deployment(tmp_path, "[Bench.ee_architecture]")
+    (workspace / "units_pkg" / "Broken.ee_architecture.yaml").write_text("name: [unclosed\n")
+    with _warnings() as messages:
+        run = run_pipeline(workspace, "units_pkg/multi.deployments.yaml", tmp_path)
+    assert any("Skipping E/E design file" in message for message in messages)
+    assert [r["name"] for r in load_build_artifacts(str(run.out_root), run.system_name).ee_architectures] == ["Bench"]
 
 
 def _system_requiring(tmp_path: Path, unit: str, capability: str):
@@ -790,8 +834,12 @@ def test_deploy_takes_peripheral_arguments_from_its_architecture(tmp_path):
     ).items()
 
 
-def test_deploy_naming_an_unlisted_architecture_fails(tmp_path):
+def test_deploy_naming_an_unlisted_architecture_warns_and_binds_by_hand(tmp_path):
     workspace = _stage_with_peripheral(tmp_path, "Ghost.ee_architecture")
-    with pytest.raises(Exception) as excinfo:
-        run_pipeline(workspace, "units_pkg/multi.deployments.yaml", tmp_path)
-    assert "names E/E architecture 'Ghost'" in str(excinfo.value)
+    with _warnings() as messages:
+        run = run_pipeline(workspace, "units_pkg/multi.deployments.yaml", tmp_path)
+    assert any("names E/E architecture 'Ghost'" in message for message in messages)
+    bench = next(
+        d for d in load_build_artifacts(str(run.out_root), run.system_name).deploy_variants if d["name"] == "bench"
+    )
+    assert "ee_architecture" not in bench and bench["arguments"] == []

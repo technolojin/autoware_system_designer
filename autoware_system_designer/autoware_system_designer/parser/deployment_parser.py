@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -23,6 +24,8 @@ from autoware_system_designer.common.path_utils import canonical_path
 from autoware_system_designer.model.config import SystemConfig
 from autoware_system_designer.parser.data_validator import entity_name_decode, split_package_qualifier
 from autoware_system_designer.parser.yaml_parser import yaml_parser
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_system_name(system_ref: str) -> str:
@@ -83,18 +86,24 @@ def _parse_deployments_list(deployments_path: str) -> Tuple[str, List[Dict[str, 
         entry = {"name": name, "arguments": arguments}
         ee_architecture = item.get("ee_architecture")
         if ee_architecture is not None:
-            if not isinstance(ee_architecture, str) or not ee_architecture:
-                raise ValidationError(
-                    f"deploy_list[{idx}].ee_architecture must be an entity name in deployments table: {deployments_path}"
+            if isinstance(ee_architecture, str) and ee_architecture:
+                entry["ee_architecture"] = ee_architecture
+            else:
+                logger.warning(
+                    f"Ignoring deploy_list[{idx}].ee_architecture, which is no entity name, in deployments table: "
+                    f"{deployments_path}"
                 )
-            entry["ee_architecture"] = ee_architecture
         deploy_list.append(entry)
 
     ee_architectures = config_yaml.get("ee_architectures") or []
-    if not isinstance(ee_architectures, list) or not all(isinstance(name, str) and name for name in ee_architectures):
-        raise ValidationError(
-            f"'ee_architectures' must be a list of entity names in deployments table: {deployments_path}"
+    if not isinstance(ee_architectures, list):
+        ee_architectures = [ee_architectures]
+    named = [name for name in ee_architectures if isinstance(name, str) and name]
+    if len(named) != len(ee_architectures):
+        logger.warning(
+            f"Ignoring 'ee_architectures' entries that are no entity names in deployments table: {deployments_path}"
         )
+    ee_architectures = named
 
     return base, deploy_list, ee_architectures
 
