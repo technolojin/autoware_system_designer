@@ -149,6 +149,14 @@ def test_rejected_descriptions(tmp_path, old, new, expected):
     assert expected in _rejected(tmp_path, TWO_DEVICES.replace(old, new))
 
 
+def test_fields_outside_the_resolver_pass_unchecked(tmp_path):
+    text = TWO_DEVICES.replace(
+        "      - {name: host, daemon_port: 8782}", "      - {name: host, daemon_port: 8782, cpus: 8}"
+    )
+    assert "cpus: 8" in text
+    assert _resolve(tmp_path, text + "notes: draft\n")["name"] == "Bench"
+
+
 def test_remote_environment_needs_an_address(tmp_path):
     text = TWO_DEVICES.replace(", address: 10.0.2.2", "").replace(", address: 10.0.1.2", "")
     assert "no address" in _rejected(tmp_path, text)
@@ -671,7 +679,7 @@ def test_peripheral_parameter_rules(tmp_path, peripherals, expected):
     assert expected in _wired_rejected(tmp_path, text, peripherals)
 
 
-def _structure(message_size: int) -> dict:
+def _structure() -> dict:
     """System structure of one mode: the talker on main_ecu publishing to the listener on sub_ecu."""
     return {
         "children": [
@@ -685,7 +693,6 @@ def _structure(message_size: int) -> dict:
                 "from_port": {
                     "role": "publisher",
                     "port_path": "/talker/output/chatter",
-                    "message_size": message_size,
                     "event": {"frequency": 10.0},
                 },
                 "to_port": {"role": "subscriber", "port_path": "/listener/input/chatter"},
@@ -694,25 +701,26 @@ def _structure(message_size: int) -> dict:
     }
 
 
-def _analysed(tmp_path: Path, message_size: int) -> dict:
+def _analysed(tmp_path: Path, lidar_rate: str) -> dict:
     text = WIRED.replace(
         "{name: eth, network: sensor, address: 10.0.3.9}",
-        "{name: eth, network: sensor, address: 10.0.3.9, data_rate: 100M}",
+        f"{{name: eth, network: sensor, address: 10.0.3.9, data_rate: {lidar_rate}}}",
     )
     system = _system_with_peripherals(tmp_path)
     return resolve_ee_architecture(
-        _architecture(tmp_path, text), system, _device_lookup(tmp_path), {"default": _structure(message_size)}
+        _architecture(tmp_path, text), system, _device_lookup(tmp_path), {"default": _structure()}
     )
 
 
 def test_analysis_has_a_flow_per_peripheral_and_unit_pair_and_the_load_per_direction(tmp_path):
-    record = _analysed(tmp_path, 1000)
+    record = _analysed(tmp_path, "100M")
     analysis = record["analysis"]["default"]
     flows = {(f["source"]["name"], f["target"]["name"]): f for f in analysis["flows"]}
     assert flows[("lidar_front", "main_ecu")]["bitrate"] == 10**8
     chatter = flows[("main_ecu", "sub_ecu")]
-    assert (chatter["kind"], chatter["bitrate"], chatter["unrated"], chatter["local"]) == ("topics", 80000, 0, False)
-    assert [t["topic"] for t in chatter["topics"]] == ["/chatter"]
+    # Topic data rates come from measurement; the design gives only the topics and their frequency.
+    assert (chatter["kind"], chatter["bitrate"], chatter["unrated"], chatter["local"]) == ("topics", None, 1, False)
+    assert [(t["topic"], t["frequency"]) for t in chatter["topics"]] == [("/chatter", 10.0)]
     # The vcu sends no declared rate; its flow is listed without load.
     assert flows[("vcu", "sub_ecu")]["bitrate"] is None
 
@@ -721,9 +729,8 @@ def test_analysis_has_a_flow_per_peripheral_and_unit_pair_and_the_load_per_direc
     lidar_link = next(i for i, e in names.items() if {"device": "lidar", "interface": "eth"} in e)
     ecu_link = next(i for i, e in names.items() if {"device": "ecu_b", "interface": "eth0"} in e)
     assert loads[lidar_link]["load"] == 10**8
-    assert loads[ecu_link]["directions"] == [{"from": "ecu_a.switch", "load": 80000}]
-    # The switch port of 10G bounds the link.
-    assert loads[ecu_link]["utilization"] == pytest.approx(80000 / 10**10)
+    assert loads[lidar_link]["directions"] == [{"from": "lidar", "load": 10**8}]
+    assert ecu_link not in loads
 
 
 def test_load_over_capacity_warns(tmp_path):
@@ -733,7 +740,7 @@ def test_load_over_capacity_warns(tmp_path):
     logger = logging.getLogger("autoware_system_designer.builder.ee_architecture")
     logger.addHandler(handler)
     try:
-        _analysed(tmp_path, 200 * 10**6)
+        _analysed(tmp_path, "2G")
     finally:
         logger.removeHandler(handler)
     assert any("over its capacity of 1000000000 bit/s" in record.getMessage() for record in records)

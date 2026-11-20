@@ -1,4 +1,4 @@
-autoware_system_design_format: 0.5.0
+autoware_system_design_format: 0.4.1
 
 name: ConcatenatePointcloudDummy.node
 
@@ -42,7 +42,6 @@ subscribers:
 publishers:
   - name: output
     message_type: std_msgs/msg/Float32MultiArray
-    message_size: 8M
 
 param_files:
   - name: param_file

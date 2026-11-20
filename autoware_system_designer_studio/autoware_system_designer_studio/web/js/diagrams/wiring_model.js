@@ -265,7 +265,6 @@
           topic: t.topic,
           msgType: text(t.msg_type),
           frequency: rate(t.frequency),
-          messageSize: rate(t.message_size),
           bitrate: rate(t.bitrate),
         })),
     };

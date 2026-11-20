@@ -91,8 +91,8 @@ analysis of the top bar's mode, each connection shows its load over its capacity
 busy or over it; the inspector of a connection lists the flows on it. `?wiring=units` draws the
 compute units inside their devices, the peripherals beside the unit whose node drives them, and
 one line per peripheral and unit and per pair of units exchanging topics, with the rate each way;
-the inspector of a line lists its topics with their rate and size, and of a unit its flows in and
-out.
+the inspector of a line lists its topics with their frequency (bit rate only when measured), and of
+a unit its flows in and out.
 
 The launch bar is the Launch activity's part of the top bar, shown on every activity: its drawer
 toggle, with a daemon launch of every unit of the shown mode and deploy and shutdown of every

@@ -1,4 +1,4 @@
-autoware_system_design_format: 0.5.0
+autoware_system_design_format: 0.4.0
 
 name: DetectedObjectMergerDummy6.node
 
@@ -34,7 +34,6 @@ subscribers:
 publishers:
   - name: merged_object
     message_type: std_msgs/msg/Int32MultiArray
-    message_size: 24k
     qos:
       reliability: reliable
       durability: transient_local

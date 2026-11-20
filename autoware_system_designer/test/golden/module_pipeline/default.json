@@ -75,7 +75,6 @@
             "is_global": false,
             "is_outward": true,
             "is_remapped": false,
-            "message_size": null,
             "msg_type": "sensor_msgs/msg/PointCloud2",
             "name": "pointcloud",
             "namespace": [
@@ -233,7 +232,6 @@
                 "is_global": false,
                 "is_outward": true,
                 "is_remapped": false,
-                "message_size": null,
                 "msg_type": "autoware_perception_msgs/msg/DetectedObjects",
                 "name": "objects",
                 "namespace": [
@@ -418,7 +416,6 @@
                 "is_global": false,
                 "is_outward": true,
                 "is_remapped": false,
-                "message_size": null,
                 "msg_type": "autoware_perception_msgs/msg/DetectedObjects",
                 "name": "objects",
                 "namespace": [
@@ -647,7 +644,6 @@
                 "is_global": false,
                 "is_outward": true,
                 "is_remapped": false,
-                "message_size": null,
                 "msg_type": "autoware_perception_msgs/msg/DetectedObjects",
                 "name": "objects",
                 "namespace": [
@@ -920,7 +916,6 @@
               "is_global": false,
               "is_outward": false,
               "is_remapped": false,
-              "message_size": null,
               "msg_type": "autoware_perception_msgs/msg/DetectedObjects",
               "name": "objects",
               "namespace": [
@@ -1015,7 +1010,6 @@
               "is_global": false,
               "is_outward": false,
               "is_remapped": false,
-              "message_size": null,
               "msg_type": "autoware_perception_msgs/msg/DetectedObjects",
               "name": "objects",
               "namespace": [
@@ -1110,7 +1104,6 @@
               "is_global": false,
               "is_outward": false,
               "is_remapped": false,
-              "message_size": null,
               "msg_type": "autoware_perception_msgs/msg/DetectedObjects",
               "name": "objects",
               "namespace": [
@@ -1151,7 +1144,6 @@
               "is_global": false,
               "is_outward": true,
               "is_remapped": false,
-              "message_size": null,
               "msg_type": "autoware_perception_msgs/msg/DetectedObjects",
               "name": "objects",
               "namespace": [
@@ -1197,7 +1189,6 @@
             "is_global": false,
             "is_outward": true,
             "is_remapped": false,
-            "message_size": null,
             "msg_type": "autoware_perception_msgs/msg/DetectedObjects",
             "name": "objects",
             "namespace": [
@@ -1379,7 +1370,6 @@
           "is_global": false,
           "is_outward": false,
           "is_remapped": false,
-          "message_size": null,
           "msg_type": "sensor_msgs/msg/PointCloud2",
           "name": "pointcloud",
           "namespace": [
@@ -1462,7 +1452,6 @@
           "is_global": false,
           "is_outward": false,
           "is_remapped": false,
-          "message_size": null,
           "msg_type": "autoware_perception_msgs/msg/DetectedObjects",
           "name": "objects",
           "namespace": [

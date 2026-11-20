@@ -50,7 +50,6 @@ CARRIES_DAEMON = "daemon"
 DEFAULT_INTERFACE_TYPE = "ethernet"
 FORWARDING_ROLES = ("switch", "router")
 KIND_BUS = "bus"
-BITS_PER_BYTE = 8
 
 # (device id, interface name); the interface is None for an unspecified port of a forwarding device.
 Node = Tuple[str, Optional[str]]
@@ -213,15 +212,13 @@ def topic_flows(structure: Dict[str, Any]) -> Dict[Tuple[str, str], List[Dict[st
             continue
         topic = link.get("topic") or ""
         frequency = rates.get(topic) or (source.get("event") or {}).get("frequency")
-        size = source.get("message_size")
         flows.setdefault(pair, {}).setdefault(
             topic,
             {
                 "topic": topic,
                 "msg_type": link.get("msg_type"),
                 "frequency": frequency or None,
-                "message_size": size,
-                "bitrate": int(frequency * size * BITS_PER_BYTE) if frequency and size else None,
+                "bitrate": None,  # known only from measurement
             },
         )
     return {pair: list(topics.values()) for pair, topics in flows.items()}
@@ -658,16 +655,20 @@ class _Resolver:
         for parameter in parameters:
             found = set()
             for host in firsts.values():
-                found.add(
-                    {
-                        "address": host["peer_address"],
-                        "interface": host["peer_interface"],
-                        "network": host["network"],
-                        "host_address": host["address"],
-                        "host_interface": host["interface"],
-                        "device": device,
-                    }[parameter["value"]]
-                )
+                derived = {
+                    "address": host["peer_address"],
+                    "interface": host["peer_interface"],
+                    "network": host["network"],
+                    "host_address": host["address"],
+                    "host_interface": host["interface"],
+                    "device": device,
+                }
+                if parameter.get("value") not in derived:
+                    raise self.fail(
+                        f"peripheral '{name}' gives parameter '{parameter.get('name')}' an unknown value "
+                        f"'{parameter.get('value')}' {sorted(derived)}"
+                    )
+                found.add(derived[parameter["value"]])
             if not found or None in found:
                 raise self.fail(
                     f"peripheral '{name}' gives parameter '{parameter['name']}' its {parameter['value']}, which "
