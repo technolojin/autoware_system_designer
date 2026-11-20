@@ -571,7 +571,6 @@ class LinkManager:
                     self.instance.resolved_path,
                     remap_target=definition.remap_target,
                     role=definition.port_role,
-                    **({"message_size": definition.message_size} if port_cls is OutPort else {}),
                 )
                 if definition.global_topic is not None:
                     port.is_global = True

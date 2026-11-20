@@ -82,7 +82,6 @@
             "is_global": false,
             "is_outward": true,
             "is_remapped": false,
-            "message_size": null,
             "msg_type": "std_msgs/msg/String",
             "name": "output",
             "namespace": [
@@ -678,7 +677,6 @@
           "is_global": false,
           "is_outward": false,
           "is_remapped": false,
-          "message_size": null,
           "msg_type": "std_msgs/msg/String",
           "name": "output",
           "namespace": [

@@ -106,60 +106,7 @@
     },
     "peripherals": {
       "type": "array",
-      "description": "Hardware outside the compute units that components talk to (sensors, actuators, vehicle controllers), by logical name; an E/E architecture binds each name to a device",
-      "items": {
-        "type": "object",
-        "required": ["name"],
-        "properties": {
-          "name": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9_]*$"
-          },
-          "description": {
-            "type": "string"
-          },
-          "component": {
-            "type": "string",
-            "description": "Top-level component whose nodes talk to the peripheral; derived from 'node' when omitted"
-          },
-          "node": {
-            "type": "string",
-            "pattern": "^/",
-            "description": "Path of the node that drives the peripheral (e.g. /sensing/lidar/lidar_top)"
-          },
-          "parameters": {
-            "type": "array",
-            "description": "Parameters of the node whose values the bound E/E architecture gives",
-            "items": {
-              "type": "object",
-              "required": ["name", "value"],
-              "properties": {
-                "name": {
-                  "type": "string",
-                  "description": "Parameter name of the node"
-                },
-                "value": {
-                  "type": "string",
-                  "enum": [
-                    "address",
-                    "interface",
-                    "network",
-                    "host_address",
-                    "host_interface",
-                    "device"
-                  ],
-                  "description": "Derived value: the peripheral's address or interface, the network both are on, the address or interface of the compute unit's device that reaches it, or the bound device instance"
-                },
-                "description": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            }
-          }
-        },
-        "additionalProperties": false
-      }
+      "description": "Experimental (E/E architecture): hardware outside the compute units that components talk to, by logical name; an E/E architecture binds each name to a device. Entries are not checked against a schema"
     },
     "compute_units": {
       "type": "array",
@@ -181,13 +128,7 @@
             "type": "string"
           },
           "requires": {
-            "type": "array",
-            "uniqueItems": true,
-            "items": {
-              "type": "string",
-              "pattern": "^[a-z][a-z0-9_]*$"
-            },
-            "description": "Capabilities the unit's execution environment has to provide (e.g. gpu); checked against the environment an E/E architecture binds the unit to"
+            "description": "Experimental (E/E architecture): capabilities the unit's execution environment has to provide (e.g. gpu); not checked against a schema"
           }
         },
         "additionalProperties": false

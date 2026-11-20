@@ -62,7 +62,6 @@ Represents a single ROS 2 node.
     - **Default**: If not provided, it defaults to `~/output/<name>`.
     - **Required when**: The node implementation uses a specific topic name that does not follow the `~/output/` convention.
   - `global`: (Optional) If set, the output topic is published to a global topic name (e.g., `/tf`).
-  - `message_size`: (Optional, format 0.5.0) Typical serialized size of one message in bytes, as an integer or with suffix `k`, `M`, `G` (e.g., `2.4M`). With the rate of the port's output event it gives the bit rate an E/E architecture analysis puts on the wiring.
 - `servers`: (Optional) List of service/action servers.
   - `name`: Server name.
   - `description`: (Optional) Brief explanation of the server.
@@ -275,6 +274,8 @@ Overrides parameters for specific nodes within the system hierarchy.
 
 ### 4.5. E/E Architecture Configuration (`.ee_architecture.yaml`)
 
+> **Experimental.** The E/E architecture (`.ee_architecture.yaml`, `.device.yaml`, and `peripherals` and compute unit `requires` in a system) is under development. Its format is not fixed and has no JSON schema; only what the build resolves is checked.
+
 Describes the hardware a system is deployed on: device instances with their interfaces, the connections between interfaces, the networks addressed over them, time synchronization, and the binding of each compute unit to an execution environment and of each peripheral to a device. A system design names compute units and peripherals only; an E/E architecture names devices, compute units and peripherals only, never components. The same system runs on another architecture without a change to its design. Addresses, interface names and ports of the hardware belong here, not in node parameters.
 **Fields:**
 
@@ -354,7 +355,7 @@ deploy_list:
 - `wiring`: every device, parts included, with its interfaces, and every connection with its capacity.
 - `peripherals`: for each, its device and addresses, per compute unit of its component the interface, network and address that reach it and the connections on the way, and the value of each of its node parameters.
 - `time_sync`: for each member, the connections from the grandmaster.
-- `analysis`: per mode, the flows into and out of the compute units and the load on each connection. A flow is one peripheral feeding one unit, at the `data_rate` of the device's interfaces, or the topics one unit publishes to another, each at its output rate times its `message_size`; topics between units of one device stay off the wiring and travel over Ethernet connections otherwise. The load of a link is that of its busiest direction, of a bus the sum of its senders; a load over the capacity warns.
+- `analysis`: per mode, the flows into and out of the compute units and the load on each connection. A flow is one peripheral feeding one unit, at the `data_rate` of the device's interfaces, or the topics one unit publishes to another, with their output rate and no bit rate, since message sizes are measured, not declared; topics between units of one device stay off the wiring and travel over Ethernet connections otherwise. The load of a link is that of its busiest direction, of a bus the sum of its senders; a load over the capacity warns.
 
 A variant (`base`) replaces `networks`, `devices`, `connections` and `time_sync` by `name` and `bindings` by `compute_unit` or `peripheral` under `override`, sets `main_environment` there, and drops entries under `remove` (see Section 5).
 

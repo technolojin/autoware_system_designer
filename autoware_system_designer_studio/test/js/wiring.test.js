@@ -280,7 +280,6 @@ const ANALYSED = {
             {
               topic: "/points",
               frequency: 10,
-              message_size: 8e6,
               bitrate: 6.4e8,
             },
           ],

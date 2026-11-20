@@ -200,10 +200,6 @@ class OutPort(Port):
     # Users list: ports subscribed to this port (for hierarchical port connections).
     # OutPort (publisher) can have multiple users (one topic subscribed by multiple nodes).
     users: List[Port] = field(default_factory=list, metadata={"ref": True, "alias": "connected_ids"})
-    # Typical serialized size of one message in bytes, declared on the publishing node port.
-    own_message_size: Optional[int] = field(default=None, metadata={"exclude": True})
-
-    __serde_computed__: ClassVar[tuple] = (*Port.__serde_computed__, ("message_size", "message_size"))
 
     def __init__(
         self,
@@ -212,12 +208,10 @@ class OutPort(Port):
         namespace: Optional[List[str]] = None,
         remap_target: Optional[str] = None,
         role: Optional[str] = None,
-        message_size: Optional[int] = None,
     ):
         super().__init__(name, msg_type, namespace, remap_target, role)
         self.users = []
         self._user_ids: Set[int] = set()
-        self.own_message_size = message_size
         self.event = PortEvent("output_" + name, self.namespace, "output", name)
         self.event.set_type("to_output")
 
@@ -230,13 +224,6 @@ class OutPort(Port):
     @property
     def unique_id(self):
         return generate_unique_id(self.namespace, "port", "output", self.name)
-
-    @property
-    def message_size(self) -> Optional[int]:
-        """Message size of the publishing node port."""
-        if self.is_interface:
-            return next((port.own_message_size for port in self.get_reference_list()), None)
-        return self.own_message_size
 
     @property
     def port_path(self):

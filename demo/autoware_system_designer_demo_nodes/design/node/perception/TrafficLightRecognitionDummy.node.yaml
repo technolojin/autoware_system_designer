@@ -1,4 +1,4 @@
-autoware_system_design_format: 0.5.0
+autoware_system_design_format: 0.4.0
 
 name: TrafficLightRecognitionDummy.node
 
@@ -30,25 +30,21 @@ subscribers:
 publishers:
   - name: traffic_signal_car
     message_type: std_msgs/msg/ColorRGBA
-    message_size: 100
     qos:
       reliability: reliable
       durability: transient_local
   - name: traffic_signal_pedestrian
     message_type: std_msgs/msg/ColorRGBA
-    message_size: 100
     qos:
       reliability: reliable
       durability: transient_local
   - name: traffic_signal_rois
     message_type: std_msgs/msg/UInt16MultiArray
-    message_size: 1k
     qos:
       reliability: reliable
       durability: transient_local
   - name: traffic_signals
     message_type: std_msgs/msg/ColorRGBA
-    message_size: 200
 
 param_files: []
 param_values: []

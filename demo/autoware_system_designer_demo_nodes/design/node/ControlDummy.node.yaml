@@ -1,4 +1,4 @@
-autoware_system_design_format: 0.5.0
+autoware_system_design_format: 0.4.1
 
 name: ControlDummy.node
 
@@ -25,16 +25,12 @@ subscribers:
 publishers:
   - name: command/control_cmd
     message_type: std_msgs/msg/Float32
-    message_size: 100
   - name: command/gear_cmd
     message_type: std_msgs/msg/UInt8
-    message_size: 16
   - name: command/hazard_lights_cmd
     message_type: std_msgs/msg/Bool
-    message_size: 16
   - name: command/turn_indicators_cmd
     message_type: std_msgs/msg/Int8
-    message_size: 16
 
 param_files: []
 param_values: []

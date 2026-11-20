@@ -41,10 +41,6 @@
   };
   const percent = (value) =>
     typeof value === "number" ? `${Math.round(value * 100)} %` : "–";
-  const bytesLabel = (size) => {
-    const short = wiring.formatBitrate(size);
-    return short ? `${short}B` : "–";
-  };
   const endLabel = (end) =>
     end.kind === "peripheral" ? `${end.name} (peripheral)` : end.name;
 
@@ -81,8 +77,9 @@
           "Rate",
           [
             topic.frequency ? `${topic.frequency} Hz` : "no rate",
-            topic.messageSize ? bytesLabel(topic.messageSize) : "no size",
-            topic.bitrate ? `${wiring.formatBitrate(topic.bitrate)}bit/s` : "",
+            topic.bitrate
+              ? `${wiring.formatBitrate(topic.bitrate)}bit/s`
+              : "not measured",
           ]
             .filter(Boolean)
             .join(" · "),

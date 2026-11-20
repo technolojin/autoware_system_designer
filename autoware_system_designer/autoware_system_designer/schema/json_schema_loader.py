@@ -23,6 +23,10 @@ from autoware_system_designer.schema.format_version import parse_format_version
 # Schema cache to avoid reloading files
 _SCHEMA_CACHE: Dict[str, dict] = {}
 
+# Experimental entity types (E/E architecture) whose format is still open; only the root has to be a mapping.
+UNCHECKED_ENTITY_TYPES = ("ee_architecture", "device")
+_UNCHECKED_SCHEMA = {"type": "object"}
+
 
 def get_schema_path(entity_type: str, version: str) -> Path:
     """Get the path to a JSON Schema file for the given entity type and version.
@@ -128,6 +132,9 @@ def load_schema(entity_type: str, version: str) -> dict:
         FileNotFoundError: If the schema file doesn't exist
         json.JSONDecodeError: If the schema file is invalid JSON
     """
+    if entity_type in UNCHECKED_ENTITY_TYPES:
+        return _UNCHECKED_SCHEMA
+
     # Resolve version (may fall back to earlier minor version)
     resolved_version = resolve_schema_version(entity_type, version)
 
