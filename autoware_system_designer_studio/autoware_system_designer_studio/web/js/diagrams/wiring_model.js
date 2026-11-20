@@ -211,8 +211,18 @@
       .map((p) => ({
         name: p.name,
         device: text(p.device),
+        interface: text(p.interface) || null,
         component: text(p.component),
-        node: text(p.node),
+        // Gateway nodes: the nodes that talk to the device, with their compute units.
+        nodes: list(p.nodes)
+          .filter((g) => g && typeof g === "object" && text(g.node))
+          .map((g) => ({
+            node: g.node,
+            component: text(g.component),
+            computeUnits: list(g.compute_units).filter(
+              (u) => typeof u === "string",
+            ),
+          })),
         description: text(p.description),
         parameters: list(p.parameters).filter(
           (v) => v && typeof v === "object" && text(v.name),
@@ -254,7 +264,7 @@
       kind: raw.kind === "peripheral" ? "peripheral" : "topics",
       source: endOf(raw.source),
       target: endOf(raw.target),
-      node: text(raw.node),
+      nodes: list(raw.nodes).filter((n) => typeof n === "string"),
       bitrate: rate(raw.bitrate),
       unrated: typeof raw.unrated === "number" ? raw.unrated : 0,
       local: raw.local === true,
@@ -291,7 +301,10 @@
             },
           ]),
       );
-      modes.set(mode, { flows, loads });
+      const disconnected = list(entry?.disconnected).filter(
+        (name) => typeof name === "string",
+      );
+      modes.set(mode, { flows, loads, disconnected });
     });
     return modes;
   }
@@ -336,6 +349,27 @@
     };
   }
 
+  // Node path cut to its last segments to fit `room` characters.
+  function shortNode(path, room) {
+    const parts = String(path || "")
+      .split("/")
+      .filter(Boolean);
+    let label = parts.pop() || "";
+    while (
+      parts.length &&
+      label.length + parts[parts.length - 1].length + 1 <= room
+    )
+      label = `${parts.pop()}/${label}`;
+    return label.length > room
+      ? `…${label.slice(label.length - room + 1)}`
+      : label;
+  }
+
+  // Peripherals whose gateway nodes include the node path.
+  function peripheralsOfNode(peripherals, node) {
+    return peripherals.filter((p) => p.nodes.some((g) => g.node === node));
+  }
+
   // Whether a top-level device forwards between its ports.
   function isInfra(device) {
     return INFRA_ROLES.has(device.role);
@@ -357,6 +391,8 @@
   wiring.formatBitrate = formatBitrate;
   wiring.unitLines = unitLines;
   wiring.unitFlows = unitFlows;
+  wiring.peripheralsOfNode = peripheralsOfNode;
+  wiring.shortNode = shortNode;
   wiring.model = model;
   wiring.isInfra = isInfra;
   wiring.deviceEnvironments = deviceEnvironments;

@@ -1,8 +1,9 @@
 // Units diagram: the compute units of an E/E architecture inside the devices
-// they are bound to, the peripherals on the left joined to the unit whose
-// node drives them, and one line per pair of units that exchange topics,
-// both directions on it. A line carries the rate of its flows; the topics
-// behind it are the inspector's.
+// they are bound to, the peripherals on the left joined to the gateway ports of
+// the units, one port per node that talks to a peripheral's hardware, and one
+// line per pair of units that exchange topics, both directions on it. A line
+// carries the rate of its flows; the topics behind it are the inspector's. A
+// peripheral none of whose gateway nodes is in the mode is drawn disconnected.
 (function () {
   const SD = window.SD;
   const wiring = (SD.wiring ||= {});
@@ -21,6 +22,12 @@
     unitW: 190,
     unitH: 40,
     unitGap: 12,
+    // Gateway port rows below a unit's name.
+    portH: 16,
+    portSize: 7,
+    // Path segments a gateway port label keeps, and the widest a unit grows for them.
+    portSegments: 2,
+    unitMaxW: 340,
     // Bulge of a unit-to-unit arc: a base, a share of its height and a step per stacked arc.
     bulge: 46,
     bulgeShare: 0.3,
@@ -63,8 +70,26 @@
     const analysis = model.analysis.get(mode) || {
       flows: [],
       loads: new Map(),
+      disconnected: [],
     };
     const lines = wiring.unitLines(analysis.flows);
+    const disconnected = new Set(analysis.disconnected || []);
+
+    // Gateway ports of each unit: one per gateway node of a peripheral line ending there.
+    const portsOf = new Map();
+    lines
+      .filter((line) => line.kind === "peripheral")
+      .forEach((line) => {
+        const unit = line.ends[1];
+        if (!portsOf.has(unit)) portsOf.set(unit, []);
+        (line.forward?.nodes || []).forEach((node) =>
+          portsOf.get(unit).push({ peripheral: line.ends[0], node, line }),
+        );
+      });
+    const unitHeight = (unit) => {
+      const count = (portsOf.get(unit) || []).length;
+      return G.unitH + (count ? count * G.portH + 4 : 0);
+    };
 
     // Devices with bound units, the main environment's first, in record order.
     const order = new Map(
@@ -97,7 +122,19 @@
       ),
     );
     const deviceX = G.pad + (peripherals.length ? peripheralW + G.gutter : 0);
-    const deviceW = G.unitW + 2 * G.devicePad;
+    // Units widen for their gateway port labels, all to one width.
+    const portLabel = (node) =>
+      String(node).split("/").filter(Boolean).slice(-G.portSegments).join("/");
+    const unitW = Math.min(
+      G.unitMaxW,
+      Math.max(
+        G.unitW,
+        ...[...portsOf.values()]
+          .flat()
+          .map((p) => textW(portLabel(p.node)) + 24),
+      ),
+    );
+    const deviceW = unitW + 2 * G.devicePad;
 
     const devices = [];
     const units = new Map();
@@ -107,7 +144,10 @@
       const h =
         G.deviceHead +
         G.devicePad +
-        hosted.length * (G.unitH + G.unitGap) -
+        hosted.reduce(
+          (sum, { unit }) => sum + unitHeight(unit) + G.unitGap,
+          0,
+        ) -
         G.unitGap +
         G.devicePad;
       const device = model.byId.get(id);
@@ -120,16 +160,24 @@
         label: id,
         sub: device?.hardware || "",
       });
-      hosted.forEach(({ unit, environment }, index) => {
+      let top = y + G.deviceHead + G.devicePad;
+      hosted.forEach(({ unit, environment }) => {
+        const x = deviceX + G.devicePad;
         units.set(unit, {
           id: unit,
           environment,
           device: id,
-          x: deviceX + G.devicePad,
-          y: y + G.deviceHead + G.devicePad + index * (G.unitH + G.unitGap),
-          w: G.unitW,
-          h: G.unitH,
+          x,
+          y: top,
+          w: unitW,
+          h: unitHeight(unit),
+          ports: (portsOf.get(unit) || []).map((port, index) => ({
+            ...port,
+            x,
+            y: top + G.unitH + index * G.portH + G.portH / 2,
+          })),
         });
+        top += unitHeight(unit) + G.unitGap;
       });
       y += h + G.deviceGap;
     });
@@ -140,12 +188,16 @@
       lines.find(
         (line) => line.kind === "peripheral" && line.ends[0] === p.name,
       )?.ends[1];
-    const centre = (unit) =>
-      units.has(unit) ? units.get(unit).y + G.unitH / 2 : Infinity;
+    const centre = (unit, name) => {
+      const box = units.get(unit);
+      if (!box) return Infinity;
+      const port = box.ports.find((p) => p.peripheral === name);
+      return port ? port.y : box.y + G.unitH / 2;
+    };
     const placed = [];
     let bottom = G.pad - G.peripheralGap;
     peripherals
-      .map((p, index) => ({ p, index, want: centre(target(p)) }))
+      .map((p, index) => ({ p, index, want: centre(target(p), p.name) }))
       .sort((a, b) => a.want - b.want || a.index - b.index)
       .forEach(({ p, want }) => {
         const top = Math.max(
@@ -156,7 +208,8 @@
         );
         placed.push({
           id: p.name,
-          device: p.device,
+          device: p.interface ? `${p.device}.${p.interface}` : p.device,
+          disconnected: disconnected.has(p.name),
           x: G.pad,
           y: top,
           w: peripheralW,
@@ -209,6 +262,7 @@
         },
       });
     });
+    // A peripheral line forks to each gateway port; one without gateway nodes ends at the unit.
     lines
       .filter((line) => line.kind === "peripheral")
       .forEach((line) => {
@@ -217,16 +271,26 @@
         if (!from || !to) return;
         const x1 = from.x + from.w;
         const y1 = from.y + from.h / 2;
+        const ports = to.ports.filter((p) => p.line === line);
+        const ends = ports.length
+          ? ports.map((p) => p.y)
+          : [to.y + Math.min(to.h, G.unitH) / 2];
         const x2 = to.x;
-        const y2 = to.y + to.h / 2;
         const mid = (x1 + x2) / 2;
-        drawn.push({
-          id: line.id,
-          line,
-          d: `M${x1} ${y1} C${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`,
-          width: weight(line),
-          label: { x: x1 + 8, y: y1 - 5, lines: [rateLabel(line.forward)] },
-        });
+        ends.forEach((y2, index) =>
+          drawn.push({
+            id: line.id,
+            line,
+            peripheral: line.ends[0],
+            d: `M${x1} ${y1} C${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`,
+            width: weight(line),
+            label: {
+              x: x1 + 8,
+              y: y1 - 5,
+              lines: index ? [] : [rateLabel(line.forward)],
+            },
+          }),
+        );
       });
 
     return {
@@ -247,6 +311,7 @@
     let root = null;
     let zoom = 1;
     let selection = null;
+    let focus = "";
 
     function applyZoom() {
       if (!root) return;
@@ -310,20 +375,75 @@
         boxes.appendChild(rect);
         text(texts, box.x + 8, box.y + 16, box.id, "name");
         text(texts, box.x + 8, box.y + 31, box.environment, "sub");
+        box.ports.forEach((port) => {
+          const size = G.portSize;
+          const mark = svg(
+            "rect",
+            {
+              x: port.x - size / 2,
+              y: port.y - size / 2,
+              width: size,
+              height: size,
+            },
+            "unit-port",
+          );
+          mark.dataset.peripheral = port.peripheral;
+          mark.dataset.gateway = port.node;
+          const title = svg("title");
+          title.textContent = `${port.node} (gateway of ${port.peripheral})`;
+          mark.appendChild(title);
+          const hit = svg(
+            "rect",
+            {
+              x: port.x - size / 2,
+              y: port.y - G.portH / 2,
+              width: box.w,
+              height: G.portH,
+            },
+            "unit-port-hit",
+          );
+          hit.dataset.gateway = port.node;
+          hit.appendChild(title.cloneNode(true));
+          hit.addEventListener("click", (e) =>
+            pick(
+              { type: "gateway", id: port.node, peripheral: port.peripheral },
+              e,
+            ),
+          );
+          boxes.append(hit, mark);
+          text(
+            texts,
+            port.x + size,
+            port.y + 3.5,
+            wiring.shortNode(port.node, Math.floor((box.w - 16) / G.charW)),
+            "sub gateway-label",
+          );
+        });
       });
       shape.peripherals.forEach((box) => {
         const rect = svg(
           "rect",
           { x: box.x, y: box.y, width: box.w, height: box.h, rx: 3 },
-          "wiring-device role-sensor",
+          `wiring-device role-sensor${box.disconnected ? " disconnected" : ""}`,
         );
-        rect.dataset.device = box.device;
+        rect.dataset.peripheral = box.id;
         rect.addEventListener("click", (e) =>
-          pick({ type: "device", id: box.device }, e),
+          pick({ type: "peripheral", id: box.id }, e),
         );
+        const title = svg("title");
+        title.textContent = box.disconnected
+          ? `${box.id}: no gateway node in this mode`
+          : box.id;
+        rect.appendChild(title);
         boxes.appendChild(rect);
         text(texts, box.x + 8, box.y + 14, box.id, "name peripheral");
-        text(texts, box.x + 8, box.y + 27, box.device, "sub");
+        text(
+          texts,
+          box.x + 8,
+          box.y + 27,
+          box.disconnected ? `${box.device} · not connected` : box.device,
+          "sub",
+        );
       });
       shape.lines.forEach((line) => {
         const cls = `unit-line kind-${line.line.kind}${line.line.local ? " local" : ""}`;
@@ -333,6 +453,7 @@
           cls,
         );
         path.dataset.line = line.id;
+        if (line.peripheral) path.dataset.peripheral = line.peripheral;
         wires.appendChild(path);
         const hit = svg("path", { d: line.d }, "wiring-hit unit-hit");
         hit.addEventListener("click", (e) =>
@@ -366,11 +487,19 @@
       root
         .querySelectorAll(".selected")
         .forEach((node) => node.classList.remove("selected"));
+      // The focused peripheral: its box, lines and gateway ports.
+      if (focus) {
+        root.querySelectorAll("[data-peripheral]").forEach((node) => {
+          if (node.dataset.peripheral === focus) node.classList.add("selected");
+        });
+      }
       if (!selection) return;
       const attribute = {
         device: "data-device",
         unit: "data-unit",
         line: "data-line",
+        peripheral: "data-peripheral",
+        gateway: "data-gateway",
       }[selection.type];
       if (!attribute) return;
       root.querySelectorAll(`[${attribute}]`).forEach((node) => {
@@ -386,6 +515,11 @@
       },
       select(next) {
         selection = next;
+        applySelection();
+      },
+      // Peripheral kept in focus across selections and activities.
+      focus(name) {
+        focus = name || "";
         applySelection();
       },
       zoomBy(factor) {

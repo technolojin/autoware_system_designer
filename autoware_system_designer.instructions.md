@@ -228,10 +228,10 @@ Top-level entry point defining the complete system.
   - `requires`: (Optional) Capabilities the unit needs from the execution environment it is launched in (e.g., `[gpu]`). Names are free (`^[a-z][a-z0-9_]*$`); an E/E architecture may bind the unit only to an environment whose `provides` holds every one of them.
 - `peripherals`: (Optional) Hardware outside the compute units that components talk to (sensors, actuators, vehicle controllers), by logical name. The system design names no device; an E/E architecture binds each name to one.
   - `name`: Peripheral identifier (`^[a-z][a-z0-9_]*$`); the key an E/E architecture binds by.
-  - `node`: (Optional) Path of the node that drives the peripheral (e.g., `/sensing/lidar/lidar_top`).
-  - `component`: (Optional) Top-level component whose nodes talk to the peripheral; derived from `node` when omitted. The interfaces and addresses the component's compute units reach the device by are derived from it.
-  - `parameters`: (Optional, with `node`) Parameters of the node whose values the bound E/E architecture gives. Network information of the hardware belongs here, not in parameter files.
-    - `name`: Parameter name of the node.
+  - `node`: (Optional) Gateway node(s) of the peripheral: the nodes that talk to its hardware, one path or a list (e.g., `/sensing/lidar/lidar_top`, or the receiver and sender of a CAN channel). How the hardware's data maps to the nodes' topics is the device's and the driver's, not the system design's. The interfaces and addresses each gateway node's compute unit reaches the device by are derived from it.
+  - `component`: (Optional) Top-level component whose nodes talk to the peripheral, for a peripheral naming no node; its compute units reach the device.
+  - `parameters`: (Optional, with `node`) Parameters of the gateway nodes whose values the bound E/E architecture gives, set on every gateway node. Network information of the hardware belongs here, not in parameter files.
+    - `name`: Parameter name of the nodes.
     - `value`: `address` (the peripheral's address on the network both are on), `interface` (the peripheral's interface), `network`, `host_address` or `host_interface` (of the compute unit's device that reaches the peripheral), or `device` (the bound device instance).
     - Each parameter is set to the system argument `<peripheral>_<parameter>`, declared by the build; a deployment that names an E/E architecture sets it (Section 4.5).
   - `description`: (Optional) Brief explanation of the peripheral.
@@ -327,7 +327,7 @@ Describes the hardware a system is deployed on: device instances with their inte
 - `main_environment`: `<device>/<environment>` whose daemon serves the compute units of the other environments. Required once compute units are bound to more than one environment.
 - `bindings`: What the system's logical names are on this hardware. Each entry is one of:
   - `compute_unit` + `environment`: Name of an `onboard` compute unit and the `<device>/<environment>` it is launched in. Several units may share one environment. The build fails when the environment does not provide a capability the unit requires.
-  - `peripheral` + `device`: Name of a peripheral of the system and the device instance it is.
+  - `peripheral` + `device`: Name of a peripheral of the system and the device instance it is. `interface` (Optional) narrows it to one interface of the device, for a device with several channels each served by its own gateway nodes (e.g., the main and the sub CAN channel of a vehicle controller).
 
 A deployments table lists the architectures its system is deployed on under `ee_architectures`. Architectures and the devices they instantiate are local to the package of the deployments table: the build looks them up among that package's files only, not across the workspace. Each is checked against the system and exported with it. A deploy names the architecture of its vehicle with `ee_architecture`, one of the listed; the build sets the deploy's argument of every peripheral parameter from it, and a studio daemon running in another architecture warns when it launches the deploy:
 
@@ -345,17 +345,20 @@ deploy_list:
 - Every `onboard` compute unit of the system is bound exactly once; `offboard` units are not bound. Every peripheral of the system is bound exactly once.
 - Addresses are unique within the architecture.
 - A connection joins interfaces of one `type`. An interface is in one connection of the architecture, and in one of the device entity it belongs to.
-- Once the architecture declares connections, a path of them joins each peripheral's device to the device of every compute unit of its component, and each time sync member to its grandmaster. A path passes through switches, routers and ports wired on inside a composite device.
+- Once the architecture declares connections, a path of them joins each peripheral's device (its bound interface, when given) to the device of every compute unit of its gateway nodes, and each time sync member to its grandmaster. A path passes through switches, routers and ports wired on inside a composite device.
 - An environment outside the main environment's network namespace has an address: its own, or an interface address of its device on a network that carries `daemon`; when no network carries it, on a network the main environment's device is on.
 - A connection between compute units in different environments of one device, where not both set `shared_memory`, warns to disable the DDS shared memory transport there.
+- A peripheral naming one node twice warns. A gateway node whose environment has its own network namespace warns when it reaches the peripheral over a bus interface, or over an Ethernet interface on a network its own address is not on. A peripheral whose device is in a time sync domain warns when the device of a gateway node's compute unit has no interface on that time base (domains joined by `source` are one time base).
 
 **Derived and exported with each architecture:**
 
 - One record per environment, with its compute units and the address its daemon answers on.
 - `wiring`: every device, parts included, with its interfaces, and every connection with its capacity.
-- `peripherals`: for each, its device and addresses, per compute unit of its component the interface, network and address that reach it and the connections on the way, and the value of each of its node parameters.
+- `peripherals`: for each, its device (and bound interface) and addresses, its gateway nodes with their components and compute units, per compute unit the interface, network and address that reach it and the connections on the way, and the value of each of its node parameters.
 - `time_sync`: for each member, the connections from the grandmaster.
-- `analysis`: per mode, the flows into and out of the compute units and the load on each connection. A flow is one peripheral feeding one unit, at the `data_rate` of the device's interfaces, or the topics one unit publishes to another, with their output rate and no bit rate, since message sizes are measured, not declared; topics between units of one device stay off the wiring and travel over Ethernet connections otherwise. The load of a link is that of its busiest direction, of a bus the sum of its senders; a load over the capacity warns.
+- `analysis`: per mode, the flows into and out of the compute units and the load on each connection. A flow is one peripheral and the gateway nodes it reaches on one unit in that mode, at the `data_rate` of the device's interfaces, or the topics one unit publishes to another, with their output rate and no bit rate, since message sizes are measured, not declared; topics between units of one device stay off the wiring and travel over Ethernet connections otherwise. The load of a link is that of its busiest direction, of a bus the sum of its senders; a load over the capacity warns. A peripheral none of whose gateway nodes is in the mode is listed under `disconnected` and carries no flow.
+
+The system structure export of each mode lists under `metadata.peripherals` the peripherals with their gateway nodes in that mode, independent of any architecture.
 
 A variant (`base`) replaces `networks`, `devices`, `connections` and `time_sync` by `name` and `bindings` by `compute_unit` or `peripheral` under `override`, sets `main_environment` there, and drops entries under `remove` (see Section 5).
 

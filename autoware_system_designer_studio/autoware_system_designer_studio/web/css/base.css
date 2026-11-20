@@ -68,6 +68,23 @@ body {
   font-family: var(--mono-font);
 }
 
+/* Button that reads as a link: jumps to another view. */
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--link-color);
+  font-family: var(--mono-font);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  word-break: break-all;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
 .diagram-error {
   display: flex;
   justify-content: center;

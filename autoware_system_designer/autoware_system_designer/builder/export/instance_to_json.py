@@ -23,6 +23,7 @@ instance's managers.
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict
 
+from autoware_system_designer.builder.ee_architecture import peripheral_nodes
 from autoware_system_designer.model.export_schema import (
     SCHEMA_VERSION,
     EventData,
@@ -142,15 +143,45 @@ def _collect_compute_units(instance: "Instance") -> list[Dict[str, Any]]:
     return dump(getattr(configuration, "compute_units", None) or [])
 
 
+def _node_paths(instance: "Instance", paths: set) -> set:
+    if instance.entity_type == "node":
+        paths.add(instance.path)
+    for child in getattr(instance, "children", {}).values():
+        _node_paths(child, paths)
+    return paths
+
+
+def _collect_peripherals(instance: "Instance") -> list[Dict[str, Any]]:
+    """Peripherals of the system with their gateway nodes in this mode: the nodes that talk to the hardware."""
+    peripherals = getattr(getattr(instance, "configuration", None), "peripherals", None)
+    if not isinstance(peripherals, list):
+        return []
+    present = _node_paths(instance, set())
+    return [
+        {
+            "name": peripheral["name"],
+            "description": peripheral.get("description", ""),
+            "component": peripheral.get("component"),
+            "nodes": [path for path in peripheral_nodes(peripheral) if path in present],
+        }
+        for peripheral in peripherals
+        if isinstance(peripheral, dict) and isinstance(peripheral.get("name"), str)
+    ]
+
+
 def collect_system_structure(instance: "Instance", system_name: str, mode: str) -> SystemStructurePayload:
     """Collect instance data with schema/version metadata for JSON handover."""
+    metadata = {
+        "system_name": system_name,
+        "mode": mode,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "compute_units": _collect_compute_units(instance),
+    }
+    peripherals = _collect_peripherals(instance)
+    if peripherals:
+        metadata["peripherals"] = peripherals
     return {
         "schema_version": SCHEMA_VERSION,
-        "metadata": {
-            "system_name": system_name,
-            "mode": mode,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "compute_units": _collect_compute_units(instance),
-        },
+        "metadata": metadata,
         "data": collect_instance_data(instance),
     }

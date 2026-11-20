@@ -270,7 +270,13 @@ class Site:
         data, metadata = export.structure(mode)
         inject_vis_guides(data)
         # Declared compute units travel with each mode's tree; the node diagram groups components by them.
-        view = {**data, "compute_units": metadata.get("compute_units") or [], "mode": mode}
+        # Peripherals mark their gateway nodes, the nodes that talk to the hardware.
+        view = {
+            **data,
+            "compute_units": metadata.get("compute_units") or [],
+            "peripherals": metadata.get("peripherals") or [],
+            "mode": mode,
+        }
         return data_script_text(assets.DATA_GLOBAL, mode, view)
 
     def _latency(self, export: SystemExport, mode: str) -> Optional[str]:

@@ -148,6 +148,13 @@ def node_component(system_config: SystemConfig, node: str) -> Optional[str]:
     return max(found, key=lambda name: len(found[name])) if found else None
 
 
+def peripheral_nodes(peripheral: Dict[str, Any]) -> List[str]:
+    """Gateway nodes of a peripheral: the nodes that talk to its device, from `node` as one path or a list."""
+    node = peripheral.get("node")
+    paths = node if isinstance(node, list) else [node]
+    return [path for path in paths if isinstance(path, str) and path]
+
+
 def peripheral_argument(peripheral: str, parameter: str) -> str:
     """System argument a node parameter of a peripheral is bound by at launch."""
     return re.sub(r"[^a-z0-9_]", "_", f"{peripheral}_{parameter}".lower())
@@ -167,7 +174,7 @@ def peripheral_arguments(peripherals: Optional[List[Dict[str, Any]]]) -> List[Di
                 {
                     "argument": peripheral_argument(peripheral["name"], parameter["name"]),
                     "peripheral": peripheral["name"],
-                    "node": peripheral.get("node"),
+                    "nodes": peripheral_nodes(peripheral),
                     "parameter": parameter["name"],
                     "value": parameter.get("value"),
                 }
@@ -198,6 +205,15 @@ def _publish_rates(instance: Dict[str, Any], rates: Dict[str, float]) -> Dict[st
     for child in instance.get("children") or []:
         _publish_rates(child, rates)
     return rates
+
+
+def _node_paths(instance: Dict[str, Any], paths: Set[str]) -> Set[str]:
+    """Paths of the nodes in one mode's system structure."""
+    if instance.get("entity_type") == "node" and instance.get("path"):
+        paths.add(instance["path"])
+    for child in instance.get("children") or []:
+        _node_paths(child, paths)
+    return paths
 
 
 def topic_flows(structure: Dict[str, Any]) -> Dict[Tuple[str, str], List[Dict[str, Any]]]:
@@ -586,18 +602,23 @@ class _Resolver:
                 return attachment["network"], attachment["address"]
         return None, None
 
-    def _hosts(self, unit: str, device: str, peripheral: str) -> List[Dict[str, Any]]:
-        """Interfaces a compute unit's device reaches a peripheral's device by, one per reached interface of it.
+    def _hosts(
+        self, unit: str, device: str, peripheral: str, interfaces: Optional[List[Dict[str, Any]]] = None
+    ) -> List[Dict[str, Any]]:
+        """Interfaces a compute unit's device reaches a peripheral's device by, one per reached interface of it;
+        only the given interfaces of it when the binding names one.
 
         Of several interfaces that reach one, the one on a network the peripheral's interface is on is taken, then
         the one with the fewest connections on the way.
         """
+        if interfaces is None:
+            interfaces = self.devices[device]["interfaces"]
         environment = self.environment_of[unit]
         host_device = environment["device"]
         own = self.devices[host_device]["interfaces"]
         pairs: List[Tuple[Dict[str, Any], Dict[str, Any], Optional[Tuple]]] = []
         if self.wired:
-            for peer in self.devices[device]["interfaces"]:
+            for peer in interfaces:
                 target = (device, peer["name"])
                 if not self._terminal(target):
                     continue
@@ -621,7 +642,7 @@ class _Resolver:
         else:
             pairs = [
                 (candidate, peer, None)
-                for peer in self.devices[device]["interfaces"]
+                for peer in interfaces
                 for candidate in own
                 if self._shared_network(candidate, peer)[0] is not None
             ][:1]
@@ -694,6 +715,60 @@ class _Resolver:
             )
         return values
 
+    def _warn_namespace(self, name: str, device: str, hosts: List[Dict[str, Any]]) -> None:
+        """Warns of a gateway environment with its own network namespace that the host interface is outside of.
+
+        Such an environment reaches an Ethernet peripheral only by its own address on the peripheral's network, and
+        a CAN or other bus interface not at all.
+        """
+        for host in hosts:
+            environment = self.environments[host["environment"]]
+            if environment["network"] != NETWORK_OWN:
+                continue
+            subnet = self.networks.get(host["network"]) if host["network"] else None
+            own = ipaddress.ip_address(environment["address"])
+            if subnet is not None and own.version == subnet.version and own in subnet:
+                continue
+            logger.warning(
+                f"E/E architecture '{self.architecture.name}': peripheral '{name}' (device '{device}') reaches "
+                f"compute unit '{host['compute_unit']}' over interface '{host['interface']}' of device "
+                f"'{host['device']}', outside the own network namespace of environment '{environment['id']}'"
+                f"{self.source}"
+            )
+
+    def warn_time_sync(self, peripherals: List[Dict[str, Any]], domains: List[Dict[str, Any]]) -> None:
+        """Warns of a peripheral whose device is synchronized while the device of a gateway node's compute unit has
+        no interface on that time base.
+
+        Domains linked by their source share one time base.
+        """
+        base: Dict[str, str] = {}
+        source_of = {domain["name"]: domain["source"] for domain in domains}
+        for name in source_of:
+            root = name
+            while source_of.get(root) is not None and source_of[root] in source_of:
+                root = source_of[root]
+            base[name] = root
+        bases_of: Dict[Node, Set[str]] = {}
+        for domain in domains:
+            ends = [domain["grandmaster"], *domain["members"]]
+            for end in ends:
+                bases_of.setdefault((end["device"], end["interface"]), set()).add(base[domain["name"]])
+        for peripheral in peripherals:
+            device = peripheral["device"]
+            synchronized = set().union(*(found for (d, _), found in bases_of.items() if d == device))
+            if not synchronized:
+                continue
+            for host_device in dict.fromkeys(host["device"] for host in peripheral["hosts"]):
+                if any(found & synchronized for (d, _), found in bases_of.items() if d == host_device):
+                    continue
+                units = sorted({host["compute_unit"] for host in peripheral["hosts"] if host["device"] == host_device})
+                logger.warning(
+                    f"E/E architecture '{self.architecture.name}': peripheral '{peripheral['name']}' is synchronized "
+                    f"by {sorted(synchronized)}, which device '{host_device}' of its compute unit(s) {units} is not"
+                    f"{self.source}"
+                )
+
     def bind_peripherals(
         self,
         peripherals: List[Dict[str, Any]],
@@ -701,8 +776,11 @@ class _Resolver:
         system_name: str,
         component_of: Callable[[str], Optional[str]],
     ) -> List[Dict[str, Any]]:
-        """Device of every peripheral of the system, with the interfaces its component's units reach it by and the
-        values its node takes."""
+        """Device of every peripheral of the system, with its gateway nodes, the interfaces their compute units reach
+        it by and the values the nodes take.
+
+        A peripheral naming no node is reached from the compute units of its component.
+        """
         declared = self._named(peripherals, "peripheral", f"system '{system_name}'")
         bindings = [b for b in self.architecture.bindings or [] if "peripheral" in b]
         repeated = _duplicates(binding["peripheral"] for binding in bindings)
@@ -715,28 +793,50 @@ class _Resolver:
                 raise self.fail(f"binds '{name}', which is no peripheral of system '{system_name}' {sorted(declared)}")
             if device not in self.devices:
                 raise self.fail(f"binds peripheral '{name}' to undeclared device '{device}' {sorted(self.devices)}")
-            node = declared[name].get("node")
-            component = declared[name].get("component")
-            if component is None and node is not None:
-                component = component_of(node)
-                if component is None:
+            interfaces = self.devices[device]["interfaces"]
+            if binding.get("interface") is not None:
+                interfaces = [i for i in interfaces if i["name"] == binding["interface"]]
+                if not interfaces:
                     raise self.fail(
-                        f"peripheral '{name}' names node '{node}', which no component of '{system_name}' holds"
+                        f"binds peripheral '{name}' to interface '{binding['interface']}', which device '{device}' "
+                        f"does not have"
                     )
+            nodes = peripheral_nodes(declared[name])
+            for path in _duplicates(nodes):
+                logger.warning(
+                    f"E/E architecture '{self.architecture.name}': peripheral '{name}' names node '{path}' more than "
+                    f"once{self.source}"
+                )
+            nodes = list(dict.fromkeys(nodes))
+            component = declared[name].get("component")
             if component is not None and component not in units_of:
                 raise self.fail(f"peripheral '{name}' names '{component}', which is no component of '{system_name}'")
-            units = [unit for unit in units_of.get(component, []) if unit in self.environment_of]
-            hosts = [host for unit in units for host in self._hosts(unit, device, name)]
+            gateways = []
+            for path in nodes:
+                held_by = component_of(path)
+                if held_by is None:
+                    raise self.fail(
+                        f"peripheral '{name}' names node '{path}', which no component of '{system_name}' holds"
+                    )
+                gateways.append({"node": path, "component": held_by, "compute_units": units_of.get(held_by, [])})
+            if gateways:
+                units = [unit for gateway in gateways for unit in gateway["compute_units"]]
+            else:
+                units = units_of.get(component, [])
+            units = [unit for unit in dict.fromkeys(units) if unit in self.environment_of]
+            hosts = [host for unit in units for host in self._hosts(unit, device, name, interfaces)]
+            self._warn_namespace(name, device, hosts)
             records.append(
                 {
                     "name": name,
                     "device": device,
-                    "component": component,
-                    "node": node,
+                    "interface": binding.get("interface"),
+                    "component": component if component is not None or not gateways else gateways[0]["component"],
+                    "nodes": gateways,
                     "description": declared[name].get("description", ""),
                     "addresses": [
                         {"interface": interface["name"], **attachment}
-                        for interface in self.devices[device]["interfaces"]
+                        for interface in interfaces
                         for attachment in interface["attachments"]
                     ],
                     "hosts": hosts,
@@ -764,8 +864,10 @@ class _Resolver:
         return None if found is None else (found[2], found[3])
 
     def analyze(self, peripherals: List[Dict[str, Any]], structures: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
-        """Per mode, the flows into and out of the compute units, one per peripheral and unit and one per ordered
-        pair of units, and the load they put on each connection.
+        """Per mode, the flows into and out of the compute units, one per peripheral and compute unit of its gateway
+        nodes in the mode and one per ordered pair of units, and the load they put on each connection.
+
+        A peripheral none of whose gateway nodes is in the mode is disconnected in it and carries no flow.
 
         A link carries each direction on its own, so its load is that of its busiest direction; a bus shares
         its capacity among all senders.
@@ -775,11 +877,24 @@ class _Resolver:
             flows: List[Dict[str, Any]] = []
             # Per flow, the routes that carry data with the rate on each.
             carriers: List[List[Tuple[List[Tuple[int, str]], int]]] = []
+            unit_of = _unit_of_port(structure.get("children") or [])
+            present = _node_paths(structure, set())
+            disconnected: List[str] = []
             for peripheral in peripherals:
                 by_unit: Dict[str, List[Dict[str, Any]]] = {}
                 for host in peripheral["hosts"]:
                     by_unit.setdefault(host["compute_unit"], []).append(host)
-                for unit, hosts in by_unit.items():
+                # Gateway nodes of this mode on each unit; a peripheral naming no node feeds its component's units.
+                gateways: Dict[str, List[str]] = {}
+                for gateway in peripheral["nodes"]:
+                    if gateway["node"] in present:
+                        gateways.setdefault(unit_of(gateway["node"]), []).append(gateway["node"])
+                if peripheral["nodes"] and not gateways:
+                    disconnected.append(peripheral["name"])
+                    continue
+                units = list(gateways) if peripheral["nodes"] else list(by_unit)
+                for unit in units:
+                    hosts = by_unit.get(unit, [])
                     rates = [host["data_rate"] for host in hosts if host["data_rate"]]
                     flows.append(
                         {
@@ -787,7 +902,7 @@ class _Resolver:
                             "kind": "peripheral",
                             "source": {"kind": "peripheral", "name": peripheral["name"]},
                             "target": {"kind": "compute_unit", "name": unit},
-                            "node": peripheral["node"],
+                            "nodes": gateways.get(unit, []),
                             "bitrate": sum(rates) if rates else None,
                             "unrated": 0 if rates else 1,
                             "routes": [host["path"] for host in hosts if host["path"] is not None],
@@ -850,7 +965,7 @@ class _Resolver:
                         f"E/E architecture '{self.architecture.name}', mode '{mode}': connection '{label}' carries "
                         f"{busiest} bit/s, over its capacity of {capacity} bit/s{self.source}"
                     )
-            analysis[mode] = {"flows": flows, "loads": loads}
+            analysis[mode] = {"flows": flows, "loads": loads, "disconnected": disconnected}
         return analysis
 
     # ---- time synchronization
@@ -1010,6 +1125,7 @@ def resolve_ee_architecture(
         lambda node: node_component(system_config, node),
     )
     time_sync = resolver.time_sync()
+    resolver.warn_time_sync(peripherals, time_sync)
     main = resolver.check_daemons()
     analysis = resolver.analyze(peripherals, structures or {})
     for peripheral in peripherals:

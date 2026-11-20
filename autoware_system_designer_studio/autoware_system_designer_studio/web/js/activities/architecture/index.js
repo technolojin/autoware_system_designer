@@ -3,7 +3,9 @@
 // what the main view shows: the connections with their load, the compute
 // units with one line per flow into and out of them, a time sync domain or a
 // peripheral's hosts; it lists the environments with their compute units. The
-// inspector shows the selected device, connection, unit or line.
+// inspector shows the selected device, connection, unit, line, peripheral or
+// gateway node. The focused peripheral is shared with the Explore activity,
+// whose gateway nodes open here and whose node graph a gateway node opens.
 (function () {
   const SD = window.SD;
   const { element, field, section, boundSelect, segmented, list } = SD.widgets;
@@ -54,7 +56,7 @@
   function flowCard(model, flow) {
     const rows = [
       row("Rate", flowRate(flow)),
-      flow.node && row("Node", flow.node),
+      flow.nodes.length && row("Gateway", flow.nodes.join(", ")),
       flow.kind === "topics" &&
         row("Way", flow.local ? "inside one device" : "over the wiring"),
       ...flow.routes.map((route, index) =>
@@ -235,8 +237,10 @@
       bound.forEach((p) => {
         const group = element("div", "info-group");
         group.appendChild(element("div", "info-subtitle", p.name));
-        if (p.node) group.appendChild(row("Node", p.node));
-        else if (p.component) group.appendChild(row("Component", p.component));
+        if (p.interface) group.appendChild(row("Interface", p.interface));
+        p.nodes.forEach((g) => group.appendChild(row("Gateway", g.node)));
+        if (!p.nodes.length && p.component)
+          group.appendChild(row("Component", p.component));
         p.parameters.forEach((parameter) =>
           group.appendChild(
             row(
@@ -285,6 +289,78 @@
         );
     });
     if (roles.length) cards.push(card("Time sync", ...roles));
+    return cards;
+  }
+
+  // A peripheral: its device, its gateway nodes, each opening the node graph,
+  // the values they take and the interfaces their units reach it by.
+  function peripheralCards(model, mode, name, openNode) {
+    const peripheral = model.peripherals.find((p) => p.name === name);
+    if (!peripheral) return [];
+    const analysis = model.analysis.get(mode);
+    const connected = !analysis?.disconnected.includes(name);
+    const gateways = card("Gateway nodes");
+    if (!peripheral.nodes.length)
+      gateways.appendChild(
+        row("Component", peripheral.component || "none named"),
+      );
+    peripheral.nodes.forEach((gateway) => {
+      const button = element("button", "link-button", gateway.node);
+      button.type = "button";
+      button.title = "Show the node in the node graph";
+      button.addEventListener("click", () => openNode(gateway.node));
+      const group = element("div", "info-group");
+      group.append(
+        button,
+        row("Unit", gateway.computeUnits.join(", ") || "none"),
+      );
+      gateways.appendChild(group);
+    });
+    const cards = [
+      card(
+        name,
+        row(
+          "Device",
+          peripheral.interface
+            ? `${peripheral.device}.${peripheral.interface}`
+            : peripheral.device,
+        ),
+        analysis &&
+          row(
+            `In ${mode}`,
+            connected ? "connected" : "not connected: no gateway node",
+          ),
+        peripheral.description && row("About", peripheral.description),
+      ),
+      gateways,
+    ];
+    if (peripheral.parameters.length)
+      cards.push(
+        card(
+          "Parameters",
+          ...peripheral.parameters.map((p) =>
+            row(p.name, `${p.resolved ?? "–"} (${p.value})`),
+          ),
+        ),
+      );
+    if (peripheral.hosts.length)
+      cards.push(
+        card(
+          "Reached by",
+          ...peripheral.hosts.map((host) =>
+            row(
+              host.compute_unit || "host",
+              [
+                host.device && endpointLabel(host),
+                host.address,
+                host.path ? "" : "no path",
+              ]
+                .filter(Boolean)
+                .join(" · "),
+            ),
+          ),
+        ),
+      );
     return cards;
   }
 
@@ -389,9 +465,35 @@
         frame.trailing.appendChild(button);
       });
 
+      // Shows a gateway node in the Explore node graph.
+      async function openNode(path) {
+        const data = await SD.NamespaceTree.loadStructure(
+          config.dataBase,
+          store.get("mode"),
+        );
+        const entity = SD.NamespaceTree.entities(data || {}).find(
+          (e) => e.entity_type === "node" && e.path === path,
+        );
+        if (!entity) return;
+        store.set("diagram", "node_diagram");
+        store.set("entity", SD.NamespaceTree.entityKey(entity));
+        store.set("activity", "explore");
+      }
+
       function select(target) {
         selected = target;
-        diagram.select(target);
+        if (target?.type === "peripheral") store.set("peripheral", target.id);
+        if (target?.type === "gateway")
+          store.set("peripheral", target.peripheral);
+        // The connections view draws a peripheral as its device.
+        const name =
+          target?.type === "gateway" ? target.peripheral : target?.id;
+        const peripheral = ["peripheral", "gateway"].includes(target?.type)
+          ? model.peripherals.find((p) => p.name === name)
+          : null;
+        diagram.select(
+          peripheral ? { type: "device", id: peripheral.device } : target,
+        );
         unitsDiagram.select(target);
         const mode = store.get("mode");
         const device =
@@ -407,6 +509,10 @@
           cards = unitCards(model, mode, target.id);
         else if (target?.type === "line")
           cards = lineCards(model, mode, target.id);
+        else if (target?.type === "peripheral")
+          cards = peripheralCards(model, mode, target.id, openNode);
+        else if (target?.type === "gateway")
+          cards = peripheralCards(model, mode, target.peripheral, openNode);
         details.replaceChildren(...cards);
         details.hidden = !cards.length;
         empty.hidden = !!cards.length;
@@ -464,7 +570,7 @@
               .filter(Boolean)
               .join(" · "),
           ]);
-        } else if (view === "peripherals") {
+        } else if (view === "peripherals" || view === "units") {
           items = model.peripherals.map((p) => [
             p.name,
             p.device && p.device !== p.name
@@ -473,7 +579,7 @@
           ]);
         }
         choices.replaceChildren();
-        if (view === "connections" || view === "units") return;
+        if (view === "connections") return;
         if (!items.length) {
           choices.appendChild(
             element(
@@ -527,11 +633,13 @@
           loads: loadToggle.checked && analysis ? analysis.loads : null,
         });
         if (view === "units") unitsDiagram.show(model, store.get("mode"));
-        // Units and lines are drawn in the units view only, connections outside it.
-        const onUnits = selected?.type === "unit" || selected?.type === "line";
+        unitsDiagram.focus(store.get("peripheral"));
+        // Units, lines and gateway ports are drawn in the units view only, connections outside it.
+        const onUnits = ["unit", "line", "gateway"].includes(selected?.type);
         const kept =
           !selected ||
           selected.type === "device" ||
+          selected.type === "peripheral" ||
           onUnits === (view === "units");
         select(kept ? selected : null);
       }
@@ -548,12 +656,28 @@
           : "";
         note.hidden = !model.logical;
         diagram.show(model);
-        select(null);
+        const focused = model.peripherals.some(
+          (p) => p.name === store.get("peripheral"),
+        );
+        select(
+          focused ? { type: "peripheral", id: store.get("peripheral") } : null,
+        );
         showEnvironments();
         showView();
       }
 
       store.onChange("architecture", load);
+      // A peripheral focused here or on a gateway node elsewhere shows in the inspector.
+      store.onChange("peripheral", (name) => {
+        if (!model) return;
+        const shown =
+          selected?.type === "gateway" ? selected.peripheral : selected?.id;
+        const onPeripheral = ["peripheral", "gateway"].includes(selected?.type);
+        if (name && (!onPeripheral || shown !== name)) {
+          if (model.peripherals.some((p) => p.name === name))
+            select({ type: "peripheral", id: name });
+        } else if (!name && onPeripheral) select(null);
+      });
       ["wiring", "domain", "peripheral", "mode"].forEach((key) =>
         store.onChange(key, showView),
       );

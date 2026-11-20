@@ -99,3 +99,25 @@
 .live-mark {
   pointer-events: none;
 }
+
+/* Gateway node: talks to a peripheral's hardware; opens the peripheral in E/E. */
+.gateway-icon {
+  cursor: pointer;
+}
+
+.gateway-icon-back {
+  fill: var(--bg-secondary);
+  stroke: var(--state-ok);
+  stroke-width: 1px;
+}
+
+.gateway-icon-glyph {
+  fill: none;
+  stroke: var(--state-ok);
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.gateway-icon:hover .gateway-icon-back {
+  fill: var(--highlight-bg);
+}
