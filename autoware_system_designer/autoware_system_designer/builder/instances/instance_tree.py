@@ -141,22 +141,29 @@ def apply_peripheral_parameters(instance: "Instance", config_registry: "ConfigRe
         node = entry["node"]
         source = source_from_config(instance.configuration, "/peripherals")
         if node is None:
-            raise ValidationError(
-                f"Peripheral '{entry['peripheral']}' gives parameter '{entry['parameter']}' and names no node",
-                source=source,
+            logger.warning(
+                f"Peripheral '{entry['peripheral']}' gives parameter '{entry['parameter']}' and names no node"
+                f"{format_source(source)}"
             )
+            continue
         if not instance.parameter_manager.find_matching_nodes(node):
             logger.info(f"Peripheral '{entry['peripheral']}': node '{node}' is not in this mode")
             continue
-        instance.parameter_manager.apply_node_parameters(
-            node,
-            [],
-            [{"name": entry["parameter"], "type": "string", "value": f"$(var {entry['argument']})"}],
-            config_registry,
-            direct_parameter_type=ParameterType.MODE,
-            source=source,
-            parameter_sources=[source],
-        )
+        try:
+            instance.parameter_manager.apply_node_parameters(
+                node,
+                [],
+                [{"name": entry["parameter"], "type": "string", "value": f"$(var {entry['argument']})"}],
+                config_registry,
+                direct_parameter_type=ParameterType.MODE,
+                source=source,
+                parameter_sources=[source],
+            )
+        except Exception as exc:
+            logger.warning(
+                f"Peripheral '{entry['peripheral']}': parameter '{entry['parameter']}' of node '{node}' is not set "
+                f"from the E/E architecture: {exc}"
+            )
 
 
 def set_module_instances(

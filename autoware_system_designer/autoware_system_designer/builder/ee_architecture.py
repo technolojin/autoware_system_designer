@@ -156,15 +156,20 @@ def peripheral_argument(peripheral: str, parameter: str) -> str:
 def peripheral_arguments(peripherals: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
     """Node parameters the peripherals of a system take from an E/E architecture, each with its argument."""
     arguments = []
-    for peripheral in peripherals or []:
-        for parameter in peripheral.get("parameters") or []:
+    for peripheral in peripherals if isinstance(peripherals, list) else []:
+        if not isinstance(peripheral, dict) or not isinstance(peripheral.get("name"), str):
+            continue
+        parameters = peripheral.get("parameters")
+        for parameter in parameters if isinstance(parameters, list) else []:
+            if not isinstance(parameter, dict) or not isinstance(parameter.get("name"), str):
+                continue
             arguments.append(
                 {
                     "argument": peripheral_argument(peripheral["name"], parameter["name"]),
                     "peripheral": peripheral["name"],
                     "node": peripheral.get("node"),
                     "parameter": parameter["name"],
-                    "value": parameter["value"],
+                    "value": parameter.get("value"),
                 }
             )
     return arguments

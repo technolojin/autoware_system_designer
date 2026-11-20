@@ -15,6 +15,7 @@
 """Launch sessions of the serve daemon, driven over a fake runtime's control socket."""
 
 import json
+import logging
 import os
 import shutil
 import sys
@@ -975,7 +976,7 @@ def test_a_monitor_snapshot_far_over_64_kib_keeps_the_channel(launching):
     launching.rpc({"method": "launch.shutdown", "params": {"compute_unit": "main_ecu"}})
 
 
-def test_launch_refuses_a_deploy_built_for_another_architecture(tmp_path, run_dir):
+def test_launch_warns_of_a_deploy_built_for_another_architecture(tmp_path, run_dir):
     install = _install_tree(tmp_path, compute_units=UNITS)
     manifest_path = next(install.rglob("deployment.json"))
     manifest = json.loads(manifest_path.read_text())
@@ -986,9 +987,17 @@ def test_launch_refuses_a_deploy_built_for_another_architecture(tmp_path, run_di
     )
     try:
         running.daemon.environment = architecture.EnvironmentBinding("Other", "ecu/host", True, None, ("main_ecu",), ())
-        status, body = _start(running, deploy="car_a")
-        assert body["error"]["code"] == api.INVALID_PARAMS, body
-        assert "for E/E architecture 'Bench'" in body["error"]["message"]
-        assert running.daemon.launch.sessions == {}
+        records = []
+        handler = logging.Handler(logging.WARNING)
+        handler.emit = records.append
+        logger = logging.getLogger("autoware_system_designer_studio.serve.server")
+        logger.addHandler(handler)
+        try:
+            status, body = _start(running, deploy="car_a")
+        finally:
+            logger.removeHandler(handler)
+        assert status == 200, body
+        assert any("is for E/E architecture 'Bench'" in record.getMessage() for record in records)
+        running.rpc({"method": "launch.shutdown", "params": {"compute_unit": "main_ecu"}})
     finally:
         running.close()

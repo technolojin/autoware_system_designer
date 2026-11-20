@@ -134,6 +134,9 @@ class ParameterSetItemDict(TypedDict, total=False):
 
 DEVICE_ROLES = ("ecu", "switch", "router", "sensor", "actuator", "other")
 
+# Design files of the experimental E/E architecture; a failure in one warns and leaves the file out.
+EXPERIMENTAL_FILE_SUFFIXES = (".ee_architecture.yaml", ".device.yaml")
+
 
 class ConfigType:
     """Constants for entity types."""

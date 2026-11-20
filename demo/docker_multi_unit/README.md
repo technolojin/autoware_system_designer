@@ -97,7 +97,7 @@ ports and the bridge subnet.
 `up` runs the `build` service first: `colcon build` of the checkout (mounted read-only) into the
 volume `asd-multi-unit-ws-<distro>`, which every architecture shares, so a later `up` rebuilds only
 what changed, and reads the architectures from the new export. Launch a unit from the Launch activity of the workbench, or by request,
-with the deploy variant built for the running architecture (`vehicle_x` is the one of `TypeAlphaBridge`; a daemon refuses
+with the deploy variant built for the running architecture (`vehicle_x` is the one of `TypeAlphaBridge`; a daemon warns on
 the variant of another architecture):
 
 ```bash

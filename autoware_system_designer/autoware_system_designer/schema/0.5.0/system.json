@@ -105,7 +105,6 @@
       }
     },
     "peripherals": {
-      "type": "array",
       "description": "Experimental (E/E architecture): hardware outside the compute units that components talk to, by logical name; an E/E architecture binds each name to a device. Entries are not checked against a schema"
     },
     "compute_units": {

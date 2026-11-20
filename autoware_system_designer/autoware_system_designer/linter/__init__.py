@@ -21,6 +21,7 @@ from autoware_system_designer.linter.file_linter import FileLinter
 from autoware_system_designer.linter.naming_linter import NamingLinter
 from autoware_system_designer.linter.report import LintResult
 from autoware_system_designer.linter.structure_linter import StructureLinter
+from autoware_system_designer.model.config import EXPERIMENTAL_FILE_SUFFIXES
 
 __all__ = ["lint_files", "LintResult"]
 
@@ -50,6 +51,11 @@ def lint_files(file_paths: List[Path]) -> List[LintResult]:
             naming_linter.lint(file_path, result)
         except Exception as e:
             result.add_error(f"Unexpected error during linting: {str(e)}")
+
+        # Issues of the experimental E/E design files are reported, never fail the lint.
+        if str(file_path).endswith(EXPERIMENTAL_FILE_SUFFIXES):
+            result.warnings.extend(result.errors)
+            result.errors = []
 
         results.append(result)
 

@@ -524,16 +524,18 @@ class ServeDaemon:
                 del self._starting[key]
 
     def _check_deploy_architecture(self, system: exports.SystemExport, deploy: Optional[str]) -> None:
-        """Refuses a deploy built for another E/E architecture than the one this daemon runs in."""
+        """Warns of a deploy built for another E/E architecture than the one this daemon runs in."""
         if deploy is None or self.environment is None:
             return
         variant = next((v for v in system.deploy_variants() if v.get("name") == deploy), None)
         wanted = (variant or {}).get("ee_architecture")
         if wanted is not None and wanted != self.environment.architecture:
-            raise api.ApiError(
-                api.INVALID_PARAMS,
-                f"deploy variant {deploy!r} of {system.id} is for E/E architecture {wanted!r}; this daemon runs in "
-                f"{self.environment.architecture!r}",
+            logger.warning(
+                "deploy variant %r of %s is for E/E architecture %r; this daemon runs in %r",
+                deploy,
+                system.id,
+                wanted,
+                self.environment.architecture,
             )
 
     async def _start_unit(
