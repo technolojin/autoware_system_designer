@@ -10,7 +10,8 @@
     SD.activities.explore;
 
   // Inspector view: the selected element's info cards, or a prompt when nothing is selected.
-  function inspectorView(slot) {
+  // A gateway node gets a card of its peripherals, each opening in the E/E view.
+  function inspectorView(slot, openPeripheral) {
     const empty = element(
       "p",
       "panel-empty",
@@ -24,10 +25,23 @@
         infoPanel.hidden = true;
         empty.hidden = false;
       },
-      show(data, type) {
+      show(data, type, peripherals = []) {
         infoPanel.hidden = false;
         empty.hidden = true;
         SD.InfoPanel.render(infoPanel, data, type);
+        if (!peripherals.length) return;
+        const card = element("div", "info-card");
+        card.appendChild(element("div", "info-title", "Gateway of"));
+        peripherals.forEach((name) => {
+          const button = element("button", "link-button", name);
+          button.type = "button";
+          button.title = "Open the peripheral in the E/E view";
+          button.addEventListener("click", () => openPeripheral(name));
+          const row = element("div", "info-row");
+          row.append(element("span", "info-label", "Peripheral"), button);
+          card.appendChild(row);
+        });
+        infoPanel.appendChild(card);
       },
     };
   }
@@ -51,9 +65,23 @@
     }),
     mount({ side, main, inspector }, { config, store }) {
       store.define("depth", "", (v) => /^[1-9]\d*$/.test(v));
+      // Shared with the E/E activity: the focused peripheral and the view it opens in.
+      store.define("peripheral", "");
+      store.define("wiring", "");
       store.syncUrl();
 
-      const host = diagramHost(main, inspectorView(inspector), config, store);
+      function openPeripheral(name) {
+        store.set("peripheral", name);
+        store.set("wiring", "units");
+        store.set("activity", "architecture");
+      }
+      const host = diagramHost(
+        main,
+        inspectorView(inspector, openPeripheral),
+        config,
+        store,
+        openPeripheral,
+      );
       const search = entitySearch(config, store, (id) => host.focus(id));
       const depth = depthSelector(config, store);
       const live = liveOverlay(config, store, host, () => main.hidden);

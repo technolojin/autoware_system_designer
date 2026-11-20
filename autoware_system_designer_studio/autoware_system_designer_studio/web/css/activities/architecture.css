@@ -272,3 +272,34 @@
 .unit-rate {
   font-size: 10px;
 }
+
+/* Gateway ports: one per node of a unit that talks to a peripheral's hardware */
+.unit-port {
+  fill: var(--bg-secondary);
+  stroke: var(--wiring-lit-2);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.unit-port-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.unit-port-hit:hover {
+  fill: var(--highlight-bg);
+}
+
+.unit-port.selected {
+  fill: var(--border-active);
+  stroke: var(--border-active);
+}
+
+.unit-port-hit.selected {
+  fill: var(--highlight-bg);
+}
+
+.wiring-device.disconnected {
+  stroke-dasharray: 4 3;
+  opacity: 0.55;
+}

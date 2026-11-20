@@ -699,7 +699,8 @@ peripherals:
 def test_peripheral_bound_by_node_gives_its_parameters(tmp_path):
     peripherals = {p["name"]: p for p in _resolve_wired(tmp_path, peripherals=NODE_PERIPHERALS)["peripherals"]}
     lidar = peripherals["lidar_front"]
-    assert (lidar["node"], lidar["component"]) == ("/talker", "talker")
+    assert lidar["component"] == "talker"
+    assert lidar["nodes"] == [{"node": "/talker", "component": "talker", "compute_units": ["main_ecu"]}]
     assert [(p["argument"], p["resolved"]) for p in lidar["parameters"]] == [
         ("lidar_front_sensor_ip", "10.0.3.9"),
         ("lidar_front_host_ip", "10.0.3.1"),
@@ -723,13 +724,11 @@ def test_peripheral_parameter_rules(tmp_path, peripherals, expected):
     assert expected in _wired_rejected(tmp_path, text, peripherals)
 
 
-def _structure() -> dict:
+def _structure(nodes=("/talker", "/listener")) -> dict:
     """System structure of one mode: the talker on main_ecu publishing to the listener on sub_ecu."""
+    units = {"/talker": "main_ecu", "/listener": "sub_ecu"}
     return {
-        "children": [
-            {"path": "/talker", "compute_unit": "main_ecu"},
-            {"path": "/listener", "compute_unit": "sub_ecu"},
-        ],
+        "children": [{"path": path, "entity_type": "node", "compute_unit": units[path]} for path in nodes],
         "links": [
             {
                 "topic": "/chatter",
@@ -775,6 +774,113 @@ def test_analysis_has_a_flow_per_peripheral_and_unit_pair_and_the_load_per_direc
     assert loads[lidar_link]["load"] == 10**8
     assert loads[lidar_link]["directions"] == [{"from": "lidar", "load": 10**8}]
     assert ecu_link not in loads
+
+
+GATEWAY_PERIPHERALS = """
+peripherals:
+  - name: lidar_front
+    node: /listener
+  - name: vcu
+    node: [/talker, /listener]
+    parameters:
+      - {name: can_interface, value: host_interface}
+"""
+
+
+def test_peripheral_with_several_gateway_nodes_is_reached_from_each_nodes_unit(tmp_path):
+    peripherals = {p["name"]: p for p in _resolve_wired(tmp_path, peripherals=GATEWAY_PERIPHERALS)["peripherals"]}
+    vcu = peripherals["vcu"]
+    assert [(g["node"], g["compute_units"]) for g in vcu["nodes"]] == [
+        ("/talker", ["main_ecu"]),
+        ("/listener", ["sub_ecu"]),
+    ]
+    assert [(h["compute_unit"], h["interface"]) for h in vcu["hosts"]] == [("main_ecu", "can0"), ("sub_ecu", "can0")]
+    assert [(p["argument"], p["resolved"]) for p in vcu["parameters"]] == [("vcu_can_interface", "can0")]
+    # The gateway node's unit, not the declared component's, reaches the device.
+    assert [h["compute_unit"] for h in peripherals["lidar_front"]["hosts"]] == ["sub_ecu"]
+
+
+def test_peripheral_bound_to_one_interface_is_reached_by_that_interface_only(tmp_path):
+    # The vcu gets a second CAN channel on a bus of ecu_b only.
+    two_channels = (
+        WIRED.replace(
+            "      - {name: can, type: can}\n", "      - {name: can, type: can}\n      - {name: diag, type: can}\n"
+        )
+        .replace(
+            "      - {name: can0, type: can}\n", "      - {name: can0, type: can}\n      - {name: can1, type: can}\n"
+        )
+        .replace("    bitrate: 500k\n", "    bitrate: 500k\n  - name: diag_can\n    bus: [ecu_b.can1, vcu.diag]\n")
+    )
+    whole = {p["name"]: p for p in _resolve_wired(tmp_path, two_channels, GATEWAY_PERIPHERALS)["peripherals"]}
+    assert sorted(h["peer_interface"] for h in whole["vcu"]["hosts"]) == ["can", "can", "diag"]
+
+    text = two_channels.replace("{peripheral: vcu, device: vcu}", "{peripheral: vcu, device: vcu, interface: can}")
+    vcu = {p["name"]: p for p in _resolve_wired(tmp_path, text, GATEWAY_PERIPHERALS)["peripherals"]}["vcu"]
+    assert vcu["interface"] == "can"
+    assert [(h["compute_unit"], h["peer_interface"]) for h in vcu["hosts"]] == [("main_ecu", "can"), ("sub_ecu", "can")]
+    ghost = text.replace("interface: can}", "interface: ghost}")
+    assert "interface 'ghost', which device 'vcu' does not have" in _wired_rejected(
+        tmp_path, ghost, GATEWAY_PERIPHERALS
+    )
+
+
+def test_peripheral_naming_a_node_twice_warns(tmp_path):
+    peripherals = GATEWAY_PERIPHERALS.replace("[/talker, /listener]", "[/talker, /talker]")
+    with _warnings() as messages:
+        _resolve_wired(tmp_path, peripherals=peripherals)
+    assert any("names node '/talker' more than once" in message for message in messages)
+
+
+def test_analysis_ends_peripheral_flows_at_the_gateway_nodes_of_each_mode(tmp_path):
+    system = _system_with_peripherals(tmp_path, GATEWAY_PERIPHERALS)
+    structures = {"default": _structure(), "talker_only": _structure(("/talker",))}
+    analysis = resolve_ee_architecture(_architecture(tmp_path, WIRED), system, _device_lookup(tmp_path), structures)[
+        "analysis"
+    ]
+    flows = {
+        (f["source"]["name"], f["target"]["name"]): f["nodes"]
+        for f in analysis["default"]["flows"]
+        if f["kind"] == "peripheral"
+    }
+    assert flows == {
+        ("lidar_front", "sub_ecu"): ["/listener"],
+        ("vcu", "main_ecu"): ["/talker"],
+        ("vcu", "sub_ecu"): ["/listener"],
+    }
+    assert analysis["default"]["disconnected"] == []
+    only = [(f["source"]["name"], f["target"]["name"]) for f in analysis["talker_only"]["flows"]]
+    assert only == [("vcu", "main_ecu")]
+    assert analysis["talker_only"]["disconnected"] == ["lidar_front"]
+
+
+def test_gateway_unit_off_the_peripherals_time_base_warns(tmp_path):
+    text = WIRED.replace("members: [ecu_b.eth0, lidar.eth]", "members: [lidar.eth]")
+    with _warnings() as messages:
+        _resolve_wired(tmp_path, text, GATEWAY_PERIPHERALS)
+    found = [m for m in messages if "is synchronized" in m]
+    assert len(found) == 1
+    assert (
+        "peripheral 'lidar_front' is synchronized by ['ecus'], which device 'ecu_b' of its compute unit(s) "
+        "['sub_ecu'] is not" in found[0]
+    )
+    with _warnings() as messages:
+        _resolve_wired(tmp_path, WIRED, GATEWAY_PERIPHERALS)
+    assert not [m for m in messages if "is synchronized" in m]
+
+
+@pytest.mark.parametrize(
+    "address, warned",
+    [("10.0.1.20", ["lidar_front", "vcu"]), ("10.0.3.20", ["vcu"])],
+)
+def test_gateway_in_an_own_network_namespace_warns_of_interfaces_outside_it(tmp_path, address, warned):
+    text = WIRED.replace(
+        "      - {name: host, daemon_port: 8782}",
+        f"      - {{name: host, daemon_port: 8782, network: own, address: {address}}}",
+    )
+    with _warnings() as messages:
+        _resolve_wired(tmp_path, text, GATEWAY_PERIPHERALS)
+    found = sorted(m.split("peripheral '")[1].split("'")[0] for m in messages if "own network namespace" in m)
+    assert found == warned
 
 
 def test_load_over_capacity_warns(tmp_path):

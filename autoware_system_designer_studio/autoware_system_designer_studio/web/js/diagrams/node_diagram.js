@@ -63,6 +63,7 @@
     // ── Data transformation ─────────────────────────────────────────────────────
 
     transformDataToElk(root) {
+      this._indexGateways(root);
       this.elementData.clear();
       this.portToEdges.clear();
       this.portToNode.clear();
@@ -203,6 +204,17 @@
       this._groupByComputeUnit(rootNode, root);
       this._buildGlobalTopicIndex();
       return rootNode;
+    }
+
+    // Node path -> peripherals it is a gateway of: the hardware the node talks to.
+    _indexGateways(root) {
+      this.gateways = new Map();
+      (root?.peripherals || []).forEach((peripheral) => {
+        (peripheral?.nodes || []).forEach((path) => {
+          if (!this.gateways.has(path)) this.gateways.set(path, []);
+          this.gateways.get(path).push(peripheral.name);
+        });
+      });
     }
 
     _indexParents(root) {
@@ -613,6 +625,11 @@
       if (containerTarget) {
         this._appendBadge(g, node, style, containerTarget);
       }
+      const peripherals =
+        userData.entity_type === "node" && this.gateways?.get(userData.path);
+      if (peripherals?.length) {
+        this._appendGatewayIcon(g, node, style, peripherals);
+      }
 
       if (node.labels?.length > 0) {
         this._appendLabels(g, node, userData, style, depth);
@@ -772,6 +789,43 @@
       };
 
       return rect;
+    }
+
+    // Hardware mark at the top right of a gateway node; a click opens its first
+    // peripheral in the E/E view.
+    _appendGatewayIcon(g, node, style, peripherals) {
+      const size = Math.round(style.badgeH * 1.5);
+      const pad = style.badgePad;
+      const icon = document.createElementNS(SVG_NS, "g");
+      icon.setAttribute(
+        "transform",
+        `translate(${node.width - size - pad},${pad})`,
+      );
+      icon.classList.add("gateway-icon");
+      icon.dataset.peripherals = peripherals.join(" ");
+      const title = document.createElementNS(SVG_NS, "title");
+      title.textContent = `Gateway of ${peripherals.join(", ")}; open in E/E`;
+      const back = document.createElementNS(SVG_NS, "rect");
+      back.setAttribute("width", size);
+      back.setAttribute("height", size);
+      back.setAttribute("rx", Math.max(1, Math.round(style.cornerR * 0.6)));
+      back.classList.add("gateway-icon-back");
+      // Chip with pins on a 10-unit grid.
+      const glyph = document.createElementNS(SVG_NS, "path");
+      glyph.setAttribute(
+        "d",
+        "M3 3h4v4H3zM4 1v2M6 1v2M4 7v2M6 7v2M1 4h2M1 6h2M7 4h2M7 6h2",
+      );
+      glyph.setAttribute("transform", `scale(${size / 10})`);
+      glyph.setAttribute("stroke-width", 1);
+      glyph.classList.add("gateway-icon-glyph");
+      icon.append(title, back, glyph);
+      icon.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (this.hasDragged) return;
+        this.options.onOpenPeripheral?.(peripherals[0]);
+      });
+      g.appendChild(icon);
     }
 
     _appendBadge(g, node, style, containerTarget) {

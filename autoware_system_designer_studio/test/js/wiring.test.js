@@ -251,7 +251,32 @@ const ANALYSED = {
     {
       name: "lidar",
       device: "lidar",
-      node: "/sensing/lidar",
+      nodes: [
+        {
+          node: "/sensing/lidar",
+          component: "sensing",
+          compute_units: ["main"],
+        },
+      ],
+      hosts: [],
+      parameters: [],
+    },
+    {
+      name: "vcu",
+      device: "vcu",
+      interface: "can1",
+      nodes: [
+        {
+          node: "/vehicle/can/receiver",
+          component: "vehicle",
+          compute_units: ["sub"],
+        },
+        {
+          node: "/vehicle/can/sender",
+          component: "vehicle",
+          compute_units: ["sub"],
+        },
+      ],
       hosts: [],
       parameters: [],
     },
@@ -264,6 +289,7 @@ const ANALYSED = {
           kind: "peripheral",
           source: { kind: "peripheral", name: "lidar" },
           target: { kind: "compute_unit", name: "main" },
+          nodes: ["/sensing/lidar"],
           bitrate: 2e8,
           unrated: 0,
           routes: [["c0"]],
@@ -304,6 +330,23 @@ const ANALYSED = {
           flows: ["f1"],
         },
       ],
+      disconnected: ["vcu"],
+    },
+    can: {
+      flows: [
+        {
+          id: "f0",
+          kind: "peripheral",
+          source: { kind: "peripheral", name: "vcu" },
+          target: { kind: "compute_unit", name: "sub" },
+          nodes: ["/vehicle/can/receiver", "/vehicle/can/sender"],
+          bitrate: null,
+          unrated: 1,
+          routes: [],
+        },
+      ],
+      loads: [],
+      disconnected: ["lidar"],
     },
   },
 };
@@ -338,10 +381,69 @@ test("units view: one line per peripheral and unit and per pair of units, both d
   );
   const arc = shape.lines.find((l) => l.id === "u:main|sub");
   assert.deepEqual(arc.label.lines, ["↓ 640M", "↑ +1?"]);
-  // The peripheral sits beside the unit it feeds.
-  const lidar = shape.peripherals[0];
+  // The peripheral sits beside the gateway port of the node that talks to it.
+  const lidar = shape.peripherals.find((p) => p.id === "lidar");
   const main = shape.units[0];
-  assert.equal(lidar.y + lidar.h / 2, main.y + main.h / 2);
+  assert.deepEqual(
+    main.ports.map((p) => [p.peripheral, p.node]),
+    [["lidar", "/sensing/lidar"]],
+  );
+  assert.equal(lidar.y + lidar.h / 2, main.ports[0].y);
+  assert.ok(main.h > shape.units[1].h);
+  const line = shape.lines.find((l) => l.id === "p:lidar|main");
+  assert.ok(line.d.endsWith(`${main.x} ${main.ports[0].y}`));
+});
+
+test("units view: a peripheral line forks to each gateway port and one with none in the mode is disconnected", () => {
+  const model = wiring.model(ANALYSED);
+  assert.equal(model.peripherals[1].interface, "can1");
+  assert.deepEqual(
+    model.peripherals[1].nodes.map((g) => [g.node, g.computeUnits]),
+    [
+      ["/vehicle/can/receiver", ["sub"]],
+      ["/vehicle/can/sender", ["sub"]],
+    ],
+  );
+  const shape = wiring.unitLayout(model, "can");
+  const sub = shape.units.find((u) => u.id === "sub");
+  assert.deepEqual(
+    sub.ports.map((p) => p.node),
+    ["/vehicle/can/receiver", "/vehicle/can/sender"],
+  );
+  const forks = shape.lines.filter((l) => l.id === "p:vcu|sub");
+  assert.equal(forks.length, 2);
+  assert.deepEqual(
+    forks.map((l) => l.label.lines.length),
+    [1, 0],
+  );
+  assert.deepEqual(
+    shape.peripherals.map((p) => [p.id, p.device, p.disconnected]),
+    [
+      ["vcu", "vcu.can1", false],
+      ["lidar", "lidar", true],
+    ],
+  );
+  assert.deepEqual(
+    wiring
+      .peripheralsOfNode(model.peripherals, "/vehicle/can/sender")
+      .map((p) => p.name),
+    ["vcu"],
+  );
+});
+
+test("a gateway node label keeps the last path segments that fit", () => {
+  assert.equal(
+    wiring.shortNode("/vehicle/j6/brake_can/socket_can_sender", 32),
+    "j6/brake_can/socket_can_sender",
+  );
+  assert.equal(
+    wiring.shortNode("/vehicle/j6/brake_can/socket_can_sender", 20),
+    "socket_can_sender",
+  );
+  assert.equal(
+    wiring.shortNode("/a/very_long_node_name_here", 10),
+    "…name_here",
+  );
 });
 
 test("a mode without analysis draws the units and no line", () => {

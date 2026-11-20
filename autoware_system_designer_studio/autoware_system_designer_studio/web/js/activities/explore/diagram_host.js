@@ -41,7 +41,20 @@
     return name ? `/${name}` : "";
   }
 
-  function diagramHost(main, inspector, config, store) {
+  // Node path -> peripherals it is a gateway of, in the mode's structure.
+  function gatewayIndex(structure) {
+    const index = new Map();
+    (structure?.peripherals || []).forEach((peripheral) => {
+      (peripheral?.nodes || []).forEach((path) => {
+        if (!index.has(path)) index.set(path, []);
+        index.get(path).push(peripheral.name);
+      });
+    });
+    return index;
+  }
+
+  // `openPeripheral(name)` shows a peripheral in the E/E view.
+  function diagramHost(main, inspector, config, store, openPeripheral) {
     const container = element("div", "diagram-container");
     const loading = element("div", "diagram-loading");
     loading.append(
@@ -53,6 +66,7 @@
     let module = null;
     // Member path -> live state, as last set; applied to every module loaded.
     let liveStates = null;
+    let gateways = new Map();
 
     function showLoading(text) {
       loading.hidden = !text;
@@ -74,6 +88,9 @@
       inspector.reset();
       showLoading(`Loading ${diagram.label.toLowerCase()}...`);
       try {
+        gateways = gatewayIndex(
+          await SD.NamespaceTree.loadStructure(config.dataBase, mode),
+        );
         await DiagramBase.loadScript(diagram.script);
         const ModuleClass = SD.diagrams.get(diagram.type);
         if (!ModuleClass)
@@ -87,11 +104,17 @@
           latencyModes: config.latencyModes,
           depth: parseInt(store.get("depth"), 10) || null,
           onInfoUpdate(data, type, entity) {
-            inspector.show(data, type);
+            const peripherals =
+              (entity?.entity_type === "node" && gateways.get(entity.path)) ||
+              [];
+            inspector.show(data, type, peripherals);
             store.set("topic", topicOf(data, type));
             if (isEntity(entity))
               store.set("entity", SD.NamespaceTree.entityKey(entity));
+            // A gateway node focuses its peripheral, which the E/E view keeps.
+            if (peripherals.length) store.set("peripheral", peripherals[0]);
           },
+          onOpenPeripheral: openPeripheral,
         });
         applyLiveStates(module);
       } catch (error) {
