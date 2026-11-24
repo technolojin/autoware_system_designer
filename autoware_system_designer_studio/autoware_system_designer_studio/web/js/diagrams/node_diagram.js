@@ -140,7 +140,8 @@
           style.nodeBaseH,
           style.nodeBaseH +
             maxPorts * (style.portSize + style.portSpacing * 2) +
-            (containerTarget ? style.badgeH + style.badgePad : 0),
+            (containerTarget ? style.badgeH + style.badgePad : 0) +
+            this._gatewayIconReserve(instance, style),
         );
 
         const title = this._titleOf(instance);
@@ -798,6 +799,24 @@
       visit(laidOut, 0);
     }
 
+    _isGateway(instance) {
+      return (
+        instance?.entity_type === "node" &&
+        !!this.gateways?.get(instance.path)?.length
+      );
+    }
+
+    _gatewayIconSize(style) {
+      return Math.round(style.badgeH * 1.5);
+    }
+
+    // Height a gateway node with inputs adds for its hardware mark above them.
+    // Ports stay centered on their side, so twice the slot lowers them by one.
+    _gatewayIconReserve(instance, style) {
+      if (!this._isGateway(instance) || !instance.in_ports?.length) return 0;
+      return (this._gatewayIconSize(style) + style.badgePad) * 2;
+    }
+
     calculateNodeWidth(instance, style, title, depth) {
       const maxWestLabelW = (instance.in_ports || []).reduce(
         (max, p) =>
@@ -906,10 +925,13 @@
       if (containerTarget) {
         this._appendBadge(g, node, style, containerTarget);
       }
-      const peripherals =
-        userData.entity_type === "node" && this.gateways?.get(userData.path);
-      if (peripherals?.length) {
-        this._appendGatewayIcon(g, node, style, peripherals);
+      if (this._isGateway(userData)) {
+        this._appendGatewayIcon(
+          g,
+          node,
+          style,
+          this.gateways.get(userData.path),
+        );
       }
 
       if (node.labels?.length > 0) {
@@ -1072,36 +1094,40 @@
       return rect;
     }
 
-    // Hardware mark at the top right of a gateway node; a click opens its first
-    // peripheral in the E/E view.
+    // Hardware mark on the input side of a gateway node, above its inputs, so
+    // hardware reads as the node's source in the left-to-right flow; a double
+    // click opens its first peripheral in the E/E view.
     _appendGatewayIcon(g, node, style, peripherals) {
-      const size = Math.round(style.badgeH * 1.5);
+      const size = this._gatewayIconSize(style);
       const pad = style.badgePad;
+      const westTops = (node.ports || [])
+        .filter((port) => (port.x || 0) + port.width / 2 <= node.width / 2)
+        .map((port) => port.y || 0);
+      const y = westTops.length
+        ? Math.min(...westTops) - style.portSpacing - pad - size
+        : Math.round(style.nodeBaseH / 2);
       const icon = document.createElementNS(SVG_NS, "g");
-      icon.setAttribute(
-        "transform",
-        `translate(${node.width - size - pad},${pad})`,
-      );
+      icon.setAttribute("transform", `translate(${pad * 2},${y})`);
       icon.classList.add("gateway-icon");
       icon.dataset.peripherals = peripherals.join(" ");
       const title = document.createElementNS(SVG_NS, "title");
-      title.textContent = `Gateway of ${peripherals.join(", ")}; open in E/E`;
+      title.textContent = `Gateway of ${peripherals.join(", ")}; double-click to open in E/E`;
       const back = document.createElementNS(SVG_NS, "rect");
       back.setAttribute("width", size);
       back.setAttribute("height", size);
       back.setAttribute("rx", Math.max(1, Math.round(style.cornerR * 0.6)));
       back.classList.add("gateway-icon-back");
-      // Chip with pins on a 10-unit grid.
+      // Plug on a 10-unit grid: cable from the left, prongs to the right.
       const glyph = document.createElementNS(SVG_NS, "path");
       glyph.setAttribute(
         "d",
-        "M3 3h4v4H3zM4 1v2M6 1v2M4 7v2M6 7v2M1 4h2M1 6h2M7 4h2M7 6h2",
+        "M0.5 5H3M7 3v4H5a2 2 0 0 1 0-4zM7 4h2.5M7 6h2.5",
       );
       glyph.setAttribute("transform", `scale(${size / 10})`);
       glyph.setAttribute("stroke-width", 1);
       glyph.classList.add("gateway-icon-glyph");
       icon.append(title, back, glyph);
-      icon.addEventListener("click", (event) => {
+      icon.addEventListener("dblclick", (event) => {
         event.stopPropagation();
         if (this.hasDragged) return;
         this.options.onOpenPeripheral?.(peripherals[0]);
