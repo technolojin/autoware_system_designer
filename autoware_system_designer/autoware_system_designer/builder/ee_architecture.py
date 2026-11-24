@@ -182,15 +182,34 @@ def peripheral_arguments(peripherals: Optional[List[Dict[str, Any]]]) -> List[Di
     return arguments
 
 
+def _held_paths(children: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Top-level component holding each node path and each of its own port paths, for components sharing a path."""
+    held: Dict[str, Dict[str, Any]] = {}
+    for child in children:
+        for port in [*(child.get("in_ports") or []), *(child.get("out_ports") or [])]:
+            if port.get("port_path"):
+                held.setdefault(port["port_path"], child)
+        for path in _node_paths(child, set()):
+            held.setdefault(path, child)
+    return held
+
+
 def _unit_of_port(children: List[Dict[str, Any]]) -> Callable[[str], Optional[str]]:
-    """Compute unit of a port path: the unit of the deepest top-level component containing it."""
+    """Compute unit of a port or node path: the unit of the top-level component holding it, else of the deepest
+    top-level component whose path contains it."""
+    held = _held_paths(children)
     roots = sorted(
         ((child.get("path") or "", child.get("compute_unit")) for child in children if child.get("path")),
         key=lambda item: -len(item[0]),
     )
 
     def unit_of(port_path: str) -> Optional[str]:
-        return next((unit for path, unit in roots if _under(port_path, path)), None)
+        path = port_path
+        while path and path != "/":
+            if path in held:
+                return held[path].get("compute_unit")
+            path = path.rsplit("/", 1)[0]
+        return next((unit for root, unit in roots if _under(port_path, root)), None)
 
     return unit_of
 
@@ -1118,11 +1137,16 @@ def resolve_ee_architecture(
     resolver.read_devices()
     resolver.read_connections()
     resolver.bind(system_units(system_config), system_requirements(system_config), system_config.name)
+    held: Dict[str, str] = {}
+    for structure in (structures or {}).values():
+        for path, child in _held_paths(structure.get("children") or []).items():
+            if child.get("name"):
+                held.setdefault(path, child["name"])
     peripherals = resolver.bind_peripherals(
         system_config.peripherals or [],
         component_units(system_config),
         system_config.name,
-        lambda node: node_component(system_config, node),
+        lambda node: held.get(node) or node_component(system_config, node),
     )
     time_sync = resolver.time_sync()
     resolver.warn_time_sync(peripherals, time_sync)

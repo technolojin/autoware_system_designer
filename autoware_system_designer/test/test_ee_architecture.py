@@ -24,7 +24,7 @@ import pytest
 from pipeline_harness import FIXTURES_DIR, run_pipeline, stage_case
 
 from autoware_system_designer.builder.config.config_registry import ConfigRegistry
-from autoware_system_designer.builder.ee_architecture import cross_unit_pairs, resolve_ee_architecture
+from autoware_system_designer.builder.ee_architecture import cross_unit_pairs, resolve_ee_architecture, topic_flows
 from autoware_system_designer.common.exceptions import ValidationError
 from autoware_system_designer.deploy import load_build_artifacts
 from autoware_system_designer.parser.data_parser import ConfigParser
@@ -742,6 +742,38 @@ def _structure(nodes=("/talker", "/listener")) -> dict:
             }
         ],
     }
+
+
+def test_topic_flows_take_the_unit_of_the_component_holding_the_port_among_components_sharing_a_path():
+    # Two camera modules under one path on different units; each port belongs to the module declaring it.
+    def module(name, unit, camera):
+        return {
+            "name": name,
+            "path": "/sensing/camera",
+            "entity_type": "module",
+            "compute_unit": unit,
+            "out_ports": [{"port_path": f"/sensing/camera/output/{camera}/image"}],
+            "children": [{"path": f"/sensing/camera/{camera}_driver", "entity_type": "node", "compute_unit": unit}],
+        }
+
+    structure = {
+        "children": [
+            module("camera", "perception_ecu_1", "camera0"),
+            module("camera_2", "perception_ecu_2", "camera4"),
+            {"path": "/detection", "entity_type": "node", "compute_unit": "main_ecu"},
+        ],
+        "links": [
+            {
+                "topic": f"/sensing/camera/{camera}/image",
+                "from_port": {"role": "publisher", "port_path": f"/sensing/camera/output/{camera}/image"},
+                "to_port": {"role": "subscriber", "port_path": "/detection/input/image"},
+            }
+            for camera in ("camera0", "camera4")
+        ],
+    }
+    flows = topic_flows(structure)
+    assert [t["topic"] for t in flows[("perception_ecu_1", "main_ecu")]] == ["/sensing/camera/camera0/image"]
+    assert [t["topic"] for t in flows[("perception_ecu_2", "main_ecu")]] == ["/sensing/camera/camera4/image"]
 
 
 def _analysed(tmp_path: Path, lidar_rate: str) -> dict:
