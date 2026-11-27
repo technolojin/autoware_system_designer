@@ -159,6 +159,8 @@
     if (caption) {
       const label = document.createElement("span");
       label.className = "rail-caption";
+      // Captions too long for the rail width take the compact size.
+      label.classList.toggle("compact", caption.length > 9);
       label.textContent = caption;
       group.appendChild(label);
     }

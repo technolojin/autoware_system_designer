@@ -594,7 +594,7 @@
     id: "replay",
     title: "Replay",
     group: "Test",
-    order: 25,
+    order: 40,
     daemon: false,
     inspector: false,
     icon: "M16 4v12M13 10l-9-6v12z",

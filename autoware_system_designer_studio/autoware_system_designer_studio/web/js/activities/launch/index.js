@@ -20,13 +20,13 @@
     resourceMap,
   } = SD.activities.launch;
 
-  // Main views by the store's `view`; Control leads the rail as the Launch group.
+  // Main views by the store's `view`; Control stands apart as the Launch group.
   const VIEWS = [
     {
       value: "control",
       label: "Control",
       group: "Launch",
-      order: 5,
+      order: 20,
       icon: "M3 3h14v14H3zM3 9h14M9 9v8",
     },
     {
@@ -58,7 +58,7 @@
     id: "launch",
     title: "Launch",
     group: "Monitor",
-    order: 20,
+    order: 30,
     daemon: false,
     subsystem: false,
     side: false,

@@ -63,7 +63,7 @@ stylesheet per area; `pages/assets.py` declares the load order of each page.
 
 An activity of the workbench owns one view per slot, shown and hidden together: its options in the
 side panel, its content in the main area and, when it selects elements, the inspector. The rail
-lists the main views of every activity in captioned groups, Launch first. The top bar holds the system
+lists the main views of every activity in captioned groups: Analyze, Launch, Monitor, Test, Experimental. The top bar holds the system
 selector, the mode, which every activity reads, and the launch bar; other selections
 live in the activity that uses them, as store keys mirrored in the URL. The system selector lists
 the systems of the site by package, each with its icon.

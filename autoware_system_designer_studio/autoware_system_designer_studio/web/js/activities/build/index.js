@@ -9,7 +9,8 @@
   SD.workbench.registerActivity({
     id: "build",
     title: "Build",
-    order: 30,
+    group: "Experimental",
+    order: 60,
     daemon: true,
     inspector: false,
     requires: ["build.start", "jobs.list", "jobs.get", "jobs.cancel"],
