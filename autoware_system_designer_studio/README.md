@@ -68,12 +68,12 @@ selector, the mode, which every activity reads, and the launch bar; other select
 live in the activity that uses them, as store keys mirrored in the URL. The system selector lists
 the systems of the site by package, each with its icon.
 
-| Activity | Rail items                                                   | Side panel                                     | Main area                                            |
-| -------- | ------------------------------------------------------------ | ---------------------------------------------- | ---------------------------------------------------- |
-| Explore  | Diagrams: Nodes, Logic, Sequence (`?diagram=`)               | entity search                                  | diagram canvas; inspector shows the selected element |
-| Launch   | Launch: Control; Monitor: Logs, Topics, Resources (`?view=`) | none                                           | the view of the mode                                 |
-| Replay   | Replay                                                       | scope tree (`?scope=`)                         | boundary, bag match, configuration, run (daemon)     |
-| Build    | Build                                                        | target, compute unit, start; job list (daemon) | log of the selected job (`?job=`)                    |
+| Activity | Rail items                                                   | Side panel                                      | Main area                                            |
+| -------- | ------------------------------------------------------------ | ----------------------------------------------- | ---------------------------------------------------- |
+| Explore  | Diagrams: Nodes, Logic, Sequence (`?diagram=`)               | depth, entity search, image download (PNG, SVG) | diagram canvas; inspector shows the selected element |
+| Launch   | Launch: Control; Monitor: Logs, Topics, Resources (`?view=`) | none                                            | the view of the mode                                 |
+| Replay   | Replay                                                       | scope tree (`?scope=`)                          | boundary, bag match, configuration, run (daemon)     |
+| Build    | Build                                                        | target, compute unit, start; job list (daemon)  | log of the selected job (`?job=`)                    |
 
 The launch bar is the Launch activity's part of the top bar, shown on every activity: its drawer
 toggle, with a daemon launch of every unit of the shown mode and deploy and shutdown of every

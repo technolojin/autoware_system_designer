@@ -23,6 +23,15 @@
   flex: 1;
 }
 
+.image-save {
+  display: flex;
+  gap: 6px;
+}
+
+.image-save .panel-button {
+  flex: 1;
+}
+
 .live-legend {
   display: flex;
   flex-wrap: wrap;

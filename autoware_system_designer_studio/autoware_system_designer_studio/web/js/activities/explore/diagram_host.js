@@ -8,6 +8,8 @@
 // the hierarchy cut at a level is handed the store's `depth`. Live member
 // states set on the host reach the module shown, now and after each load,
 // where the module draws them; a measurement reload reaches it the same way.
+// `saveImage` downloads the drawing of a module that exports one, and
+// `onLoad` reports each finished load.
 (function () {
   const SD = window.SD;
   const { element } = SD.widgets;
@@ -53,6 +55,7 @@
     let module = null;
     // Member path -> live state, as last set; applied to every module loaded.
     let liveStates = null;
+    const loadListeners = [];
 
     function showLoading(text) {
       loading.hidden = !text;
@@ -107,6 +110,30 @@
       } finally {
         showLoading("");
       }
+      loadListeners.forEach((listener) => listener());
+    }
+
+    function canSaveImage() {
+      return typeof module?.exportImage === "function";
+    }
+
+    // Downloads the whole drawing as `format`, named after the system, mode and diagram.
+    async function saveImage(format) {
+      const target = module;
+      if (typeof target?.exportImage !== "function") return;
+      await target.ready;
+      const blob = await target.exportImage(format);
+      const link = element("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${[
+        config.deploymentName,
+        store.get("mode"),
+        store.get("diagram"),
+      ]
+        .filter(Boolean)
+        .join("_")}.${format}`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 0);
     }
 
     async function focus(id) {
@@ -169,6 +196,9 @@
       updateTheme,
       setLiveStates,
       reloadMeasurement,
+      canSaveImage,
+      saveImage,
+      onLoad: (listener) => loadListeners.push(listener),
     };
   }
 

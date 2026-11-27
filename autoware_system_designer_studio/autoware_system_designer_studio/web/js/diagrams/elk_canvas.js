@@ -8,6 +8,34 @@
   const FIT_SCALE_CAP = 1;
   const MAX_ZOOM = 5;
 
+  // Presentation an exported drawing carries on its own elements, in place of the page's stylesheets.
+  const EXPORT_STYLE_PROPERTIES = [
+    "display",
+    "visibility",
+    "opacity",
+    "fill",
+    "fill-opacity",
+    "stroke",
+    "stroke-opacity",
+    "stroke-width",
+    "stroke-dasharray",
+    "stroke-linecap",
+    "stroke-linejoin",
+    "font-family",
+    "font-size",
+    "font-weight",
+    "font-style",
+    "letter-spacing",
+    "text-anchor",
+    "dominant-baseline",
+  ];
+  // Margin around an exported drawing, as a fraction of its longer side.
+  const EXPORT_MARGIN_RATIO = 0.01;
+  // Raster limits of an exported drawing: pixels per drawing unit, side and area in pixels.
+  const EXPORT_MAX_SCALE = 4;
+  const EXPORT_MAX_SIDE = 16000;
+  const EXPORT_MAX_AREA = 1.2e8;
+
   // Trigger semantics carried by shape: the type of a process event is what
   // decides how many of its triggers have to fire before it does; a queue is
   // the slotted buffer between a filling chain and its readers.
@@ -328,6 +356,100 @@
         }
       }
       textEl.textContent = lo > 0 ? text.slice(0, lo) + "…" : "…";
+    }
+
+    // ── Image export ────────────────────────────────────────────────────────────
+
+    // First opaque background behind the canvas.
+    _canvasBackground() {
+      for (let node = this.container; node; node = node.parentElement) {
+        const color = getComputedStyle(node).backgroundColor;
+        if (color && color !== "transparent" && !/, 0\)$/.test(color))
+          return color;
+      }
+      return this.isDarkMode() ? "#000" : "#fff";
+    }
+
+    // The whole drawing as a standalone SVG document in drawing units, whatever
+    // the viewport shows; null before the first render.
+    exportSvg() {
+      const root = this.currentSvgRoot;
+      const layer = this.zoomLayer;
+      if (!root || !layer) return null;
+      const bbox = layer.getBBox();
+      if (!bbox.width || !bbox.height) return null;
+
+      const copy = root.cloneNode(true);
+      const sources = root.querySelectorAll("*");
+      copy.querySelectorAll("*").forEach((target, i) => {
+        const computed = getComputedStyle(sources[i]);
+        EXPORT_STYLE_PROPERTIES.forEach((name) => {
+          const value = computed.getPropertyValue(name);
+          if (value) target.style.setProperty(name, value);
+        });
+      });
+
+      const margin = Math.max(bbox.width, bbox.height) * EXPORT_MARGIN_RATIO;
+      const x = bbox.x - margin;
+      const y = bbox.y - margin;
+      const width = bbox.width + margin * 2;
+      const height = bbox.height + margin * 2;
+      copy.querySelector("#zoom-layer").removeAttribute("transform");
+      copy.setAttribute("xmlns", SVG_NS);
+      copy.setAttribute("viewBox", `${x} ${y} ${width} ${height}`);
+      copy.setAttribute("width", width);
+      copy.setAttribute("height", height);
+      copy.removeAttribute("style");
+
+      const background = document.createElementNS(SVG_NS, "rect");
+      background.setAttribute("x", x);
+      background.setAttribute("y", y);
+      background.setAttribute("width", width);
+      background.setAttribute("height", height);
+      background.setAttribute("fill", this._canvasBackground());
+      copy.insertBefore(background, copy.firstChild);
+
+      return {
+        text: new XMLSerializer().serializeToString(copy),
+        width,
+        height,
+      };
+    }
+
+    // The whole drawing as an image blob, "svg" or "png"; the raster takes the
+    // largest scale within the export limits.
+    async exportImage(format) {
+      const drawing = this.exportSvg();
+      if (!drawing) throw new Error("no drawing to export");
+      const svgBlob = new Blob([drawing.text], {
+        type: "image/svg+xml;charset=utf-8",
+      });
+      if (format === "svg") return svgBlob;
+
+      const scale = Math.min(
+        EXPORT_MAX_SCALE,
+        EXPORT_MAX_SIDE / Math.max(drawing.width, drawing.height),
+        Math.sqrt(EXPORT_MAX_AREA / (drawing.width * drawing.height)),
+      );
+      const url = URL.createObjectURL(svgBlob);
+      try {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(drawing.width * scale));
+        canvas.height = Math.max(1, Math.round(drawing.height * scale));
+        canvas
+          .getContext("2d")
+          .drawImage(image, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise((resolve) =>
+          canvas.toBlob(resolve, "image/png"),
+        );
+        if (!blob) throw new Error("the drawing is too large to rasterize");
+        return blob;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     }
 
     // ── Viewport / navigation ───────────────────────────────────────────────────

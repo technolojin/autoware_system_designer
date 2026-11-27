@@ -1,11 +1,12 @@
-// Explore activity: the diagrams as rail items, entity search and depth switch
-// beside the diagram canvas, with the inspector showing the selected element. Search
+// Explore activity: the diagrams as rail items, entity search, depth switch
+// and image download beside the diagram canvas, with the inspector showing the
+// selected element. Search
 // is offered for diagrams that locate entities, the depth switch for diagrams
 // that draw the hierarchy cut at a level. With a daemon, the live state of the
 // launched members overlays the canvas.
 (function () {
   const SD = window.SD;
-  const { element } = SD.widgets;
+  const { element, section } = SD.widgets;
   const { diagramHost, entitySearch, depthSelector, liveOverlay } =
     SD.activities.explore;
 
@@ -30,6 +31,44 @@
         SD.InfoPanel.render(infoPanel, data, type);
       },
     };
+  }
+
+  // Download buttons of the shown diagram's whole drawing, one per image
+  // format; disabled while the diagram exports none or a download is rendering.
+  // A failed download is reported under the buttons.
+  function imageSaver(host) {
+    const row = element("div", "image-save");
+    const buttons = ["png", "svg"].map((format) => {
+      const button = element("button", "panel-button", format.toUpperCase());
+      button.type = "button";
+      button.title = `Save the whole diagram as a ${format.toUpperCase()} image`;
+      button.addEventListener("click", async () => {
+        enable(false);
+        note.hidden = true;
+        try {
+          await host.saveImage(format);
+        } catch (error) {
+          console.error("explore image:", error);
+          note.textContent = `Image not saved: ${error.message}`;
+          note.hidden = false;
+        } finally {
+          enable(host.canSaveImage());
+        }
+      });
+      row.appendChild(button);
+      return button;
+    });
+    function enable(on) {
+      buttons.forEach((button) => (button.disabled = !on));
+    }
+    const note = element("p", "panel-banner-error");
+    note.hidden = true;
+    enable(false);
+    host.onLoad(() => {
+      note.hidden = true;
+      enable(host.canSaveImage());
+    });
+    return section("Image", row, note);
   }
 
   SD.workbench.registerActivity({
@@ -58,7 +97,12 @@
       const depth = depthSelector(config, store);
       const live = liveOverlay(config, store, host, () => main.hidden);
       const sideBlocks = SD.widgets.sideSplit(side);
-      sideBlocks.top.append(depth, search.element, live.element);
+      sideBlocks.top.append(
+        depth,
+        search.element,
+        live.element,
+        imageSaver(host),
+      );
       sideBlocks.scroll.appendChild(search.results);
 
       function showDiagramOptions() {
