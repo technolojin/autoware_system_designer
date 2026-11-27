@@ -14,6 +14,8 @@
   // Title of a box that holds other boxes: font size as a fraction of its
   // laid-out width, evened out between the boxes sharing a parent.
   const TITLE_WIDTH_RATIO = 1 / 25;
+  // The same for the outermost box, whose width is the whole diagram's.
+  const OUTER_TITLE_WIDTH_RATIO = 1 / 60;
   const TITLE_LINE_HEIGHT = 1.25;
   // Caption size over the title size.
   const TITLE_CAPTION_RATIO = 5 / 8;
@@ -740,11 +742,16 @@
         );
       };
 
+      // The system or subsystem box, inside the canvas node when it has one.
+      const outer = isContainer(laidOut)
+        ? laidOut
+        : (laidOut.children || []).find(isContainer);
+
       const visit = (node, depth) => {
         const children = childrenOf(node, depth);
         const mean = meanSize(children);
         children.forEach((entry) => {
-          if (!isContainer(entry.child)) return;
+          if (!isContainer(entry.child) || entry.child === outer) return;
           // A compute unit is titled at the size of the modules it holds.
           const size = isUnit(entry.child)
             ? meanSize(childrenOf(entry.child, entry.depth))
@@ -757,8 +764,25 @@
         });
         children.forEach((entry) => visit(entry.child, entry.depth));
       };
-      if (isContainer(laidOut))
-        place(laidOut, 0, ownSize(laidOut, this.getLayerStyle(0)));
+      if (outer) {
+        // No smaller than the titles of the boxes directly inside.
+        const inner = childrenOf(outer, 0);
+        const innerSizes = [
+          meanSize(inner),
+          ...inner
+            .filter(({ child }) => isUnit(child))
+            .map((entry) => meanSize(childrenOf(entry.child, entry.depth))),
+        ];
+        place(
+          outer,
+          0,
+          Math.max(
+            this.getLayerStyle(0).fontSize,
+            Math.round(outer.width * OUTER_TITLE_WIDTH_RATIO),
+            ...innerSizes.map((size) => size ?? 0),
+          ),
+        );
+      }
       visit(laidOut, 0);
     }
 
