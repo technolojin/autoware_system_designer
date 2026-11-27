@@ -11,10 +11,9 @@
   const FOCUS_VIEW_FRACTION = 0.25;
   const MAX_FOCUS_ZOOM = 5;
 
-  // Title of a box that holds other boxes: font size as a fraction of the
-  // width of the box enclosing it, at most a fraction of its own width.
-  const TITLE_ENCLOSING_RATIO = 1 / 100;
-  const TITLE_OWN_RATIO = 1 / 12;
+  // Title of a box that holds other boxes: font size as a fraction of its
+  // laid-out width, evened out between the boxes sharing a parent.
+  const TITLE_WIDTH_RATIO = 1 / 40;
   const TITLE_LINE_HEIGHT = 1.25;
   // Caption size over the title size.
   const TITLE_CAPTION_RATIO = 5 / 8;
@@ -604,28 +603,57 @@
         : width;
     }
 
-    // Lines of the title's tokens within `maxWidth`. With `shrink`, the font
-    // size drops until the widest token fits on a line.
-    _layoutTitle(title, fontSize, maxWidth, bold, shrink = false) {
-      const widthsAt = (size) =>
-        title.tokens.map((_, i) => this._titleTokenWidth(title, i, size, bold));
-      let widths = widthsAt(fontSize);
-      const widest = Math.max(...widths);
-      if (shrink && widest > maxWidth) {
-        fontSize = Math.max(1, Math.floor((fontSize * maxWidth) / widest));
-        widths = widthsAt(fontSize);
+    // Pieces of a token each within `maxWidth`, cut after an underscore where one is near.
+    _splitToken(text, fontSize, maxWidth, widen) {
+      const fits = (piece) =>
+        this.measureTextWidth(piece, fontSize) * widen <= maxWidth;
+      const pieces = [];
+      let rest = text;
+      while (rest.length > 1 && !fits(rest)) {
+        let cut = 1;
+        while (cut < rest.length - 1 && fits(rest.slice(0, cut + 1))) cut++;
+        const underscore = rest.lastIndexOf("_", cut - 1);
+        if (underscore >= cut / 2) cut = underscore + 1;
+        pieces.push(rest.slice(0, cut));
+        rest = rest.slice(cut);
       }
+      pieces.push(rest);
+      return pieces;
+    }
+
+    // Lines of the title's tokens within `maxWidth`, wrapped between tokens.
+    // With `split`, a token wider than a line continues on the next.
+    _layoutTitle(title, fontSize, maxWidth, bold, split = false) {
+      const last = title.tokens.length - 1;
+      const parts = [];
+      title.tokens.forEach((token, i) => {
+        const own = i === last;
+        const widen = bold && own ? BOLD_WIDTH_FACTOR : 1;
+        const width = this.measureTextWidth(token, fontSize) * widen;
+        if (!split || width <= maxWidth) {
+          parts.push({ text: token, own, width });
+          return;
+        }
+        this._splitToken(token, fontSize, maxWidth, widen).forEach((text) =>
+          parts.push({
+            text,
+            own,
+            width: this.measureTextWidth(text, fontSize) * widen,
+            wrapped: true,
+          }),
+        );
+      });
       const lines = [];
       let line = null;
       let lineWidth = 0;
-      title.tokens.forEach((token, i) => {
-        if (!line || lineWidth + widths[i] > maxWidth) {
+      parts.forEach((part) => {
+        if (!line || part.wrapped || lineWidth + part.width > maxWidth) {
           line = [];
           lineWidth = 0;
           lines.push(line);
         }
-        line.push({ text: token, own: i === title.tokens.length - 1 });
-        lineWidth += widths[i];
+        line.push({ text: part.text, own: part.own });
+        lineWidth += part.width;
       });
       const captionSize = title.caption
         ? Math.max(1, Math.round(fontSize * TITLE_CAPTION_RATIO))
@@ -646,9 +674,11 @@
       return Math.max(0, Math.ceil(layout.height - style.nodeBaseH / 2));
     }
 
-    // Titles of the boxes holding other boxes, sized from the widths of
-    // `laidOut`; the top padding of each such box in `graphData` takes the
-    // height of its title.
+    // Titles of the boxes holding other boxes. Each takes a size from its own
+    // width in `laidOut`; the boxes sharing a parent then take the mean of
+    // theirs, and the outermost box keeps its own. The top padding of each
+    // such box in `graphData` takes the height of its title. Childless boxes
+    // keep the size of their level.
     _sizeContainerTitles(laidOut, graphData) {
       const inputs = new Map();
       const index = (node) => {
@@ -657,45 +687,56 @@
       };
       index(graphData);
 
-      const visit = (node, depth, enclosingWidth) => {
-        const title = this.titles.get(node.id);
-        if (title && node.children?.length) {
-          const style = this.getLayerStyle(depth);
-          const fontSize = Math.min(
-            Math.max(
-              style.fontSize,
-              Math.round(enclosingWidth * TITLE_ENCLOSING_RATIO),
-            ),
-            Math.max(style.fontSize, Math.round(node.width * TITLE_OWN_RATIO)),
-          );
-          const layout = this._layoutTitle(
-            title,
-            fontSize,
-            node.width - style.elkPadding * 2,
-            isBoldTitle(depth),
-            true,
-          );
-          this.titleLayouts.set(node.id, layout);
-          const input = inputs.get(node.id);
-          const top = Math.max(
-            style.elkPadding,
-            Math.ceil(layout.height + layout.fontSize * 0.4),
-          );
-          const side = style.elkPadding;
-          (input.properties ||= {})["org.eclipse.elk.padding"] =
-            `[top=${top},left=${side},bottom=${side},right=${side}]`;
-        }
-        (node.children || []).forEach((child) => {
-          const isCluster =
-            this.elementData.get(child.id)?.entity_type === "compute_unit";
-          visit(
-            child,
-            title && !isCluster ? depth + 1 : depth,
-            title ? node.width : child.width,
-          );
-        });
+      const isContainer = (node) =>
+        this.titles.has(node.id) && node.children?.length > 0;
+      const ownSize = (node, style) =>
+        Math.max(style.fontSize, Math.round(node.width * TITLE_WIDTH_RATIO));
+
+      const place = (node, depth, fontSize) => {
+        const style = this.getLayerStyle(depth);
+        const layout = this._layoutTitle(
+          this.titles.get(node.id),
+          fontSize,
+          node.width - style.elkPadding * 2,
+          isBoldTitle(depth),
+          true,
+        );
+        this.titleLayouts.set(node.id, layout);
+        const top = Math.max(
+          style.elkPadding,
+          Math.ceil(layout.height + fontSize * 0.4),
+        );
+        const side = style.elkPadding;
+        (inputs.get(node.id).properties ||= {})["org.eclipse.elk.padding"] =
+          `[top=${top},left=${side},bottom=${side},right=${side}]`;
       };
-      visit(laidOut, 0, laidOut.width);
+
+      const visit = (node, depth) => {
+        const titled = this.titles.has(node.id);
+        const children = (node.children || []).map((child) => ({
+          child,
+          depth:
+            !titled ||
+            this.elementData.get(child.id)?.entity_type === "compute_unit"
+              ? depth
+              : depth + 1,
+        }));
+        const containers = children.filter(({ child }) => isContainer(child));
+        if (containers.length) {
+          const mean = Math.round(
+            containers.reduce(
+              (sum, entry) =>
+                sum + ownSize(entry.child, this.getLayerStyle(entry.depth)),
+              0,
+            ) / containers.length,
+          );
+          containers.forEach((entry) => place(entry.child, entry.depth, mean));
+        }
+        children.forEach((entry) => visit(entry.child, entry.depth));
+      };
+      if (isContainer(laidOut))
+        place(laidOut, 0, ownSize(laidOut, this.getLayerStyle(0)));
+      visit(laidOut, 0);
     }
 
     calculateNodeWidth(instance, style, title, depth) {
