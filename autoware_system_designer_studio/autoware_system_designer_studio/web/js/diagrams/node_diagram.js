@@ -509,7 +509,7 @@
           description: unit.description || "",
           members: members.map((m) => this.elementData.get(m.id)?.name || m.id),
         });
-        this.titles.set(clusterId, { caption: kind, tokens: [name] });
+        this.titles.set(clusterId, { caption: "", tokens: [name] });
         const cluster = {
           id: clusterId,
           labels: [{ text: kind }, { text: name }],
@@ -679,8 +679,9 @@
     }
 
     // Titles of the boxes holding other boxes. Each takes a size from its own
-    // width in `laidOut`; the boxes sharing a parent then take the mean of
-    // theirs, and the outermost box keeps its own. The top padding of each
+    // width in `laidOut`; the modules sharing a parent then take the mean of
+    // theirs, a compute unit the size of its modules, and the outermost box
+    // keeps its own. The top padding of each
     // such box in `graphData` takes the height of its title. Childless boxes
     // keep the size of their level.
     _sizeContainerTitles(laidOut, graphData) {
@@ -715,27 +716,45 @@
           `[top=${top},left=${side},bottom=${side},right=${side}]`;
       };
 
-      const visit = (node, depth) => {
-        const titled = this.titles.has(node.id);
-        const children = (node.children || []).map((child) => ({
+      const isUnit = (node) =>
+        this.elementData.get(node.id)?.entity_type === "compute_unit";
+      // Children of a box with the level each is drawn at; a compute unit
+      // stays at the level of the box it sits in.
+      const childrenOf = (node, depth) =>
+        (node.children || []).map((child) => ({
           child,
-          depth:
-            !titled ||
-            this.elementData.get(child.id)?.entity_type === "compute_unit"
-              ? depth
-              : depth + 1,
+          depth: !this.titles.has(node.id) || isUnit(child) ? depth : depth + 1,
         }));
-        const containers = children.filter(({ child }) => isContainer(child));
-        if (containers.length) {
-          const mean = Math.round(
-            containers.reduce(
-              (sum, entry) =>
-                sum + ownSize(entry.child, this.getLayerStyle(entry.depth)),
-              0,
-            ) / containers.length,
+      // Mean size of the modules among `entries`, null without any.
+      const meanSize = (entries) => {
+        const modules = entries.filter(
+          ({ child }) => isContainer(child) && !isUnit(child),
+        );
+        if (!modules.length) return null;
+        return Math.round(
+          modules.reduce(
+            (sum, entry) =>
+              sum + ownSize(entry.child, this.getLayerStyle(entry.depth)),
+            0,
+          ) / modules.length,
+        );
+      };
+
+      const visit = (node, depth) => {
+        const children = childrenOf(node, depth);
+        const mean = meanSize(children);
+        children.forEach((entry) => {
+          if (!isContainer(entry.child)) return;
+          // A compute unit is titled at the size of the modules it holds.
+          const size = isUnit(entry.child)
+            ? meanSize(childrenOf(entry.child, entry.depth))
+            : mean;
+          place(
+            entry.child,
+            entry.depth,
+            size ?? this.getLayerStyle(entry.depth + 1).fontSize,
           );
-          containers.forEach((entry) => place(entry.child, entry.depth, mean));
-        }
+        });
         children.forEach((entry) => visit(entry.child, entry.depth));
       };
       if (isContainer(laidOut))
