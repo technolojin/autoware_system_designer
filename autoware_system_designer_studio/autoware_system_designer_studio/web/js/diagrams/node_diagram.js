@@ -13,7 +13,7 @@
 
   // Title of a box that holds other boxes: font size as a fraction of its
   // laid-out width, evened out between the boxes sharing a parent.
-  const TITLE_WIDTH_RATIO = 1 / 40;
+  const TITLE_WIDTH_RATIO = 1 / 25;
   const TITLE_LINE_HEIGHT = 1.25;
   // Caption size over the title size.
   const TITLE_CAPTION_RATIO = 5 / 8;
@@ -581,19 +581,23 @@
 
     // ── Styling / metrics ────────────────────────────────────────────────────────
 
-    // Title of an entity: its namespace segments and then its own name, the
-    // last token; the system root carries its name alone.
+    // Title of an entity, its own name the last token: a module by the
+    // segments of its path, a node by its namespace segments and then its
+    // name; the system root carries its name alone.
     _titleOf(instance) {
       const name = instance.name || String(instance.unique_id) || "Unnamed";
-      const segments = String(instance.namespace || "")
-        .split("/")
-        .filter(Boolean);
       if (instance.entity_type === "system")
         return { caption: "", tokens: [name] };
-      return {
-        caption: "",
-        tokens: [...segments.map((s) => `/${s}`), `/${name}`],
-      };
+      const segmentsOf = (text) =>
+        String(text || "")
+          .split("/")
+          .filter(Boolean);
+      const path = segmentsOf(instance.path);
+      const segments =
+        instance.entity_type === "module" && path.length
+          ? path
+          : [...segmentsOf(instance.namespace), name];
+      return { caption: "", tokens: segments.map((s) => `/${s}`) };
     }
 
     _titleTokenWidth(title, index, fontSize, bold) {
