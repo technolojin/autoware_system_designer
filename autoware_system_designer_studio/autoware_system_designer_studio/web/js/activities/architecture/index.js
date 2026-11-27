@@ -11,11 +11,12 @@
   const { element, field, section, boundSelect, segmented, list } = SD.widgets;
   const wiring = SD.wiring;
 
+  // Views of the wiring, then the compute units on a row of their own.
   const VIEWS = [
     ["connections", "Connections"],
-    ["units", "Units"],
     ["sync", "Time sync"],
     ["peripherals", "Peripherals"],
+    ["units", "Units"],
   ];
   const ZOOM_STEP = 1.25;
 
@@ -414,8 +415,8 @@
   SD.workbench.registerActivity({
     id: "architecture",
     title: "E/E",
-    group: "Analyze",
-    order: 15,
+    group: "Experimental",
+    order: 50,
     daemon: false,
     inspector: true,
     icon: "M3 3h5v4H3zM12 3h5v4h-5zM7.5 13h5v4h-5zM5.5 7v3h9V7M10 10v3",
@@ -519,6 +520,7 @@
       }
 
       const views = segmented(VIEWS, (value) => store.set("wiring", value));
+      views.element.classList.add("ee-views");
       const capacity = document.createElement("input");
       capacity.type = "checkbox";
       capacity.checked = true;
