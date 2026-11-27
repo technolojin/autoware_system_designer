@@ -76,6 +76,9 @@ OWN_PACKAGES = ("autoware_system_designer_studio", "autoware_system_designer_run
 
 # Seconds a status page waits before reloading while an export may be mid-rewrite.
 RETRY_RELOAD_S = 2
+# Seconds the page of an address that serves nothing stays before the systems index replaces it.
+NOT_FOUND_REDIRECT_S = 1
+INDEX_PATH = "/"
 
 MAX_CONNECTIONS = 64
 MAX_EVENT_SUBSCRIBERS = 16
@@ -108,9 +111,16 @@ def _package_version() -> Optional[str]:
         return None
 
 
-def _status_page(status: HTTPStatus, title: str, message: str, *, reload_s: Optional[int] = None) -> Response:
-    """HTML answer to a page navigation that has no page; it reloads itself when the cause is transient."""
-    refresh = f'<meta http-equiv="refresh" content="{reload_s}">' if reload_s else ""
+def _status_page(
+    status: HTTPStatus, title: str, message: str, *, reload_s: Optional[int] = None, index_s: Optional[int] = None
+) -> Response:
+    """HTML answer to a page navigation that has no page; it reloads itself when the cause is transient,
+    or moves to the systems index after ``index_s`` seconds."""
+    refresh = ""
+    if reload_s:
+        refresh = f'<meta http-equiv="refresh" content="{reload_s}">'
+    elif index_s:
+        refresh = f'<meta http-equiv="refresh" content="{index_s};url={INDEX_PATH}">'
     links = "".join(
         f'<link rel="icon" type="image/svg+xml" href="/{assets.BUNDLE_DIR}/{path}" media="(prefers-color-scheme: {scheme})">'
         for scheme, path in assets.FAVICONS.items()
@@ -121,7 +131,7 @@ def _status_page(status: HTTPStatus, title: str, message: str, *, reload_s: Opti
         f'<script src="/{assets.BUNDLE_DIR}/{assets.PAGE_SCRIPTS[0]}"></script></head>'
         '<body class="simple-page"><div class="page-container">'
         f'<h1>{html.escape(title)}</h1><p class="description">{html.escape(message)}</p>'
-        '<div class="nav-links"><a href="/">Systems</a></div>'
+        f'<div class="nav-links"><a href="{INDEX_PATH}">Systems</a></div>'
         "</div><script>SD.theme.init();</script></body></html>"
     )
     headers = [("Content-Type", "text/html; charset=utf-8"), ("Cache-Control", "no-store")]
@@ -765,13 +775,14 @@ class ServeDaemon:
                     "A build is running; the system may be absent until its export is written again. "
                     "This page reloads until it is."
                     if building
-                    else "No exported system or page matches this address."
+                    else "No exported system or page matches this address. The systems index opens next."
                 )
                 return _status_page(
                     HTTPStatus.NOT_FOUND,
                     "Page not found",
                     message,
                     reload_s=RETRY_RELOAD_S if building else None,
+                    index_s=None if request.path == INDEX_PATH else NOT_FOUND_REDIRECT_S,
                 )
             raise api.ApiError(api.NOT_FOUND, f"nothing served at {request.path}")
         content_type = _content_type(Path(site_path))

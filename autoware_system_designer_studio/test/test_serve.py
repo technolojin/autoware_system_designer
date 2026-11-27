@@ -205,7 +205,7 @@ def test_missing_page_answers_with_an_html_page(served):
     assert response.status == 404
     assert response.getheader("Content-Type") == "text/html; charset=utf-8"
     assert b"Page not found" in payload and b'href="/"' in payload
-    assert b"refresh" not in payload
+    assert b'<meta http-equiv="refresh" content="1;url=/">' in payload
     assert served.request("GET", "/systems.html")[0].status == 404
 
 
@@ -406,4 +406,4 @@ def test_missing_page_reloads_while_a_build_runs(served):
     asyncio.run_coroutine_threadsafe(served.daemon.jobs.start(spec), served.loop).result(5)
     response, payload = served.request("GET", f"/systems/other/{SYSTEM}/index.html")
     assert response.status == 404
-    assert b'http-equiv="refresh"' in payload and b"A build is running" in payload
+    assert b'<meta http-equiv="refresh" content="2">' in payload and b"A build is running" in payload
