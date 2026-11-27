@@ -11,6 +11,19 @@
   const FOCUS_VIEW_FRACTION = 0.25;
   const MAX_FOCUS_ZOOM = 5;
 
+  // Title of a box that holds other boxes: font size as a fraction of the
+  // width of the box enclosing it, at most a fraction of its own width.
+  const TITLE_ENCLOSING_RATIO = 1 / 100;
+  const TITLE_OWN_RATIO = 1 / 12;
+  const TITLE_LINE_HEIGHT = 1.25;
+  // Caption size over the title size.
+  const TITLE_CAPTION_RATIO = 5 / 8;
+  // Width of a bold title over its measured regular width.
+  const BOLD_WIDTH_FACTOR = 1.08;
+  const isBoldTitle = (depth) => depth <= 1;
+  // Namespace segments of a title stand back from the name they lead to.
+  const PREFIX_OPACITY = 0.7;
+
   // Layout graph around a root that carries boundary ports; it is not drawn.
   const CANVAS_ID = "__canvas__";
 
@@ -44,6 +57,9 @@
       // entity in the structure, drawn or not.
       this.collapsedIds = new Set();
       this.parentOf = new Map();
+      // Box id -> title text, and its lines at the size the layout gave it.
+      this.titles = new Map();
+      this.titleLayouts = new Map();
 
       // Settles once the first layout is drawn.
       this.ready = this.init();
@@ -73,6 +89,8 @@
       this.portToEdges.clear();
       this.portToNode.clear();
       this.collapsedIds.clear();
+      this.titles.clear();
+      this.titleLayouts.clear();
       this._indexParents(root);
       // Layer scales count from the deepest level drawn.
       this.maxDepth = Math.min(this.findMaxDepth(root), this.depthLimit);
@@ -123,6 +141,16 @@
             (containerTarget ? style.badgeH + style.badgePad : 0),
         );
 
+        const title = this._titleOf(instance);
+        this.titles.set(nodeId, title);
+        const width = this.calculateNodeWidth(instance, style, title, depth);
+        const titleLayout = this._layoutTitle(
+          title,
+          style.fontSize,
+          width - style.badgePad * 2,
+          isBoldTitle(depth),
+        );
+
         const node = {
           id: nodeId,
           labels: [
@@ -130,8 +158,8 @@
             { text: instance.name || nodeId || "Unnamed" },
           ],
           namespace: instance.namespace || "",
-          width: this.calculateNodeWidth(instance, style),
-          height: nodeHeight,
+          width,
+          height: nodeHeight + this._titleOverflow(titleLayout, style) * 2,
           children: [],
           ports: [],
           properties: {
@@ -175,6 +203,7 @@
             }
           }
         }
+        if (!node.children.length) this.titleLayouts.set(nodeId, titleLayout);
 
         if (instance.links && inside) {
           node.edges = instance.links
@@ -395,7 +424,14 @@
       hubNode.width = Math.max(
         style.nodeWidth,
         maxTopicW + innerPad,
-        this.measureTextWidth("Remap Hub", style.fontSize) + innerPad,
+        this.measureTextWidth("Remap Hub", style.fontSize) * BOLD_WIDTH_FACTOR +
+          innerPad,
+      );
+      const hubTitle = { caption: "System Remaps", tokens: ["Remap Hub"] };
+      this.titles.set(remapNodeId, hubTitle);
+      this.titleLayouts.set(
+        remapNodeId,
+        this._layoutTitle(hubTitle, style.fontSize, hubNode.width, true),
       );
       hubNode.height = Math.max(
         style.nodeBaseH,
@@ -474,6 +510,7 @@
           description: unit.description || "",
           members: members.map((m) => this.elementData.get(m.id)?.name || m.id),
         });
+        this.titles.set(clusterId, { caption: kind, tokens: [name] });
         const cluster = {
           id: clusterId,
           labels: [{ text: kind }, { text: name }],
@@ -545,7 +582,123 @@
 
     // ── Styling / metrics ────────────────────────────────────────────────────────
 
-    calculateNodeWidth(instance, style) {
+    // Title of an entity: its namespace segments and then its own name, the
+    // last token; the system root carries its name alone.
+    _titleOf(instance) {
+      const name = instance.name || String(instance.unique_id) || "Unnamed";
+      const segments = String(instance.namespace || "")
+        .split("/")
+        .filter(Boolean);
+      if (instance.entity_type === "system")
+        return { caption: "", tokens: [name] };
+      return {
+        caption: "",
+        tokens: [...segments.map((s) => `/${s}`), `/${name}`],
+      };
+    }
+
+    _titleTokenWidth(title, index, fontSize, bold) {
+      const width = this.measureTextWidth(title.tokens[index], fontSize);
+      return bold && index === title.tokens.length - 1
+        ? width * BOLD_WIDTH_FACTOR
+        : width;
+    }
+
+    // Lines of the title's tokens within `maxWidth`. With `shrink`, the font
+    // size drops until the widest token fits on a line.
+    _layoutTitle(title, fontSize, maxWidth, bold, shrink = false) {
+      const widthsAt = (size) =>
+        title.tokens.map((_, i) => this._titleTokenWidth(title, i, size, bold));
+      let widths = widthsAt(fontSize);
+      const widest = Math.max(...widths);
+      if (shrink && widest > maxWidth) {
+        fontSize = Math.max(1, Math.floor((fontSize * maxWidth) / widest));
+        widths = widthsAt(fontSize);
+      }
+      const lines = [];
+      let line = null;
+      let lineWidth = 0;
+      title.tokens.forEach((token, i) => {
+        if (!line || lineWidth + widths[i] > maxWidth) {
+          line = [];
+          lineWidth = 0;
+          lines.push(line);
+        }
+        line.push({ text: token, own: i === title.tokens.length - 1 });
+        lineWidth += widths[i];
+      });
+      const captionSize = title.caption
+        ? Math.max(1, Math.round(fontSize * TITLE_CAPTION_RATIO))
+        : 0;
+      return {
+        fontSize,
+        captionSize,
+        lines,
+        height:
+          fontSize * 0.5 +
+          captionSize * TITLE_LINE_HEIGHT +
+          lines.length * fontSize * TITLE_LINE_HEIGHT,
+      };
+    }
+
+    // Height of a title beyond the band a childless box keeps above its ports.
+    _titleOverflow(layout, style) {
+      return Math.max(0, Math.ceil(layout.height - style.nodeBaseH / 2));
+    }
+
+    // Titles of the boxes holding other boxes, sized from the widths of
+    // `laidOut`; the top padding of each such box in `graphData` takes the
+    // height of its title.
+    _sizeContainerTitles(laidOut, graphData) {
+      const inputs = new Map();
+      const index = (node) => {
+        inputs.set(node.id, node);
+        (node.children || []).forEach(index);
+      };
+      index(graphData);
+
+      const visit = (node, depth, enclosingWidth) => {
+        const title = this.titles.get(node.id);
+        if (title && node.children?.length) {
+          const style = this.getLayerStyle(depth);
+          const fontSize = Math.min(
+            Math.max(
+              style.fontSize,
+              Math.round(enclosingWidth * TITLE_ENCLOSING_RATIO),
+            ),
+            Math.max(style.fontSize, Math.round(node.width * TITLE_OWN_RATIO)),
+          );
+          const layout = this._layoutTitle(
+            title,
+            fontSize,
+            node.width - style.elkPadding * 2,
+            isBoldTitle(depth),
+            true,
+          );
+          this.titleLayouts.set(node.id, layout);
+          const input = inputs.get(node.id);
+          const top = Math.max(
+            style.elkPadding,
+            Math.ceil(layout.height + layout.fontSize * 0.4),
+          );
+          const side = style.elkPadding;
+          (input.properties ||= {})["org.eclipse.elk.padding"] =
+            `[top=${top},left=${side},bottom=${side},right=${side}]`;
+        }
+        (node.children || []).forEach((child) => {
+          const isCluster =
+            this.elementData.get(child.id)?.entity_type === "compute_unit";
+          visit(
+            child,
+            title && !isCluster ? depth + 1 : depth,
+            title ? node.width : child.width,
+          );
+        });
+      };
+      visit(laidOut, 0, laidOut.width);
+    }
+
+    calculateNodeWidth(instance, style, title, depth) {
       const maxWestLabelW = (instance.in_ports || []).reduce(
         (max, p) =>
           Math.max(
@@ -562,8 +715,12 @@
           ),
         0,
       );
-      const titleName = instance.name || String(instance.unique_id) || "";
-      const titleW = this.measureTextWidth(titleName, style.fontSize);
+      const bold = isBoldTitle(depth);
+      const titleW = Math.max(
+        ...title.tokens.map((_, i) =>
+          this._titleTokenWidth(title, i, style.fontSize, bold),
+        ),
+      );
       const innerPad = style.portSize * 3;
       return Math.max(
         style.nodeWidth,
@@ -577,7 +734,7 @@
     async layoutAndRenderNodeDiagram(graphData) {
       if (!this.elk) throw new Error("ELK instance not initialized");
 
-      const graph = await this.elk.layout(graphData, {
+      const layoutOptions = {
         layoutOptions: {
           algorithm: "layered",
           "org.eclipse.elk.direction": "RIGHT",
@@ -595,7 +752,15 @@
             "QUADRATIC",
           "org.eclipse.elk.padding": "[top=50,left=50,bottom=50,right=50]",
         },
-      });
+      };
+      // A box's width is known once laid out, and its title is sized from the
+      // widths; the second layout makes room for the titles.
+      const sized = await this.elk.layout(
+        structuredClone(graphData),
+        layoutOptions,
+      );
+      this._sizeContainerTitles(sized, graphData);
+      const graph = await this.elk.layout(graphData, layoutOptions);
 
       this.renderNodeDiagram(graph);
       this.fitToScreen();
@@ -847,40 +1012,52 @@
 
     _appendLabels(g, node, userData, style, depth) {
       const visGuide = userData.vis_guide || {};
-      const fontSize = style.fontSize;
-      let yOffset = Math.round(fontSize * 0.8);
-
-      if (node.labels.length > 1 && node.labels[0].text) {
-        const nsText = document.createElementNS(SVG_NS, "text");
-        nsText.setAttribute("x", node.width / 2);
-        nsText.setAttribute("y", yOffset);
-        nsText.classList.add("node-label");
-        nsText.style.fontSize = style.nsSize + "px";
-        nsText.style.fill = this.isDarkMode()
-          ? visGuide.dark_text_color || "#adb5bd"
-          : visGuide.text_color || "#6c757d";
-        const nsLines = this._wrapSVGText(
-          nsText,
-          node.namespace,
-          node.width / 2,
-          node.width - style.badgePad * 2,
-          style.nsSize,
-        );
-        g.appendChild(nsText);
-        yOffset += (style.nsSize + 2) * nsLines;
-      }
-
-      const nameText = document.createElementNS(SVG_NS, "text");
-      nameText.setAttribute("x", node.width / 2);
-      nameText.setAttribute("y", yOffset + fontSize / 2);
-      nameText.textContent = node.labels[node.labels.length - 1].text;
-      nameText.classList.add("node-label");
-      nameText.style.fontSize = `${fontSize}px`;
-      nameText.style.fill = this.isDarkMode()
+      const title = this.titles.get(node.id);
+      if (!title) return;
+      const bold = isBoldTitle(depth);
+      const layout =
+        this.titleLayouts.get(node.id) ||
+        this._layoutTitle(title, style.fontSize, node.width, bold);
+      const { fontSize, captionSize } = layout;
+      const mutedFill = this.isDarkMode()
+        ? visGuide.dark_text_color || "#adb5bd"
+        : visGuide.text_color || "#6c757d";
+      const nameFill = this.isDarkMode()
         ? visGuide.dark_text_color || "#e9ecef"
         : visGuide.text_color || "#333";
-      if (depth <= 1) nameText.style.fontWeight = "bold";
-      g.appendChild(nameText);
+      let y = fontSize * 0.5;
+
+      if (title.caption) {
+        const caption = document.createElementNS(SVG_NS, "text");
+        caption.setAttribute("x", node.width / 2);
+        caption.setAttribute("y", y + (captionSize * TITLE_LINE_HEIGHT) / 2);
+        caption.textContent = title.caption;
+        caption.classList.add("node-label");
+        caption.style.fontSize = `${captionSize}px`;
+        caption.style.fill = mutedFill;
+        g.appendChild(caption);
+        y += captionSize * TITLE_LINE_HEIGHT;
+      }
+
+      const lineHeight = fontSize * TITLE_LINE_HEIGHT;
+      const text = document.createElementNS(SVG_NS, "text");
+      text.classList.add("node-label");
+      text.style.fontSize = `${fontSize}px`;
+      layout.lines.forEach((line, lineIndex) => {
+        line.forEach((token, tokenIndex) => {
+          const span = document.createElementNS(SVG_NS, "tspan");
+          if (tokenIndex === 0) {
+            span.setAttribute("x", node.width / 2);
+            span.setAttribute("y", y + lineHeight * (lineIndex + 0.5));
+          }
+          span.textContent = token.text;
+          span.style.fill = token.own ? nameFill : mutedFill;
+          if (!token.own) span.style.fillOpacity = PREFIX_OPACITY;
+          if (token.own && bold) span.style.fontWeight = "bold";
+          text.appendChild(span);
+        });
+      });
+      g.appendChild(text);
     }
 
     _buildPortGroup(port, userData, style) {

@@ -310,52 +310,6 @@
       return width;
     }
 
-    _wrapSVGText(textEl, text, x, maxWidth, fontSize) {
-      if (this.measureTextWidth(text, fontSize) <= maxWidth) {
-        textEl.textContent = text;
-        return 1;
-      }
-      textEl.textContent = "";
-      const lines = [];
-      let remaining = text;
-      while (remaining.length > 0) {
-        if (this.measureTextWidth(remaining, fontSize) <= maxWidth) {
-          lines.push(remaining);
-          break;
-        }
-        let lo = 1,
-          hi = remaining.length - 1;
-        while (lo < hi) {
-          const mid = Math.ceil((lo + hi) / 2);
-          if (
-            this.measureTextWidth(remaining.slice(0, mid), fontSize) <= maxWidth
-          ) {
-            lo = mid;
-          } else {
-            hi = mid - 1;
-          }
-        }
-        let breakIdx = lo;
-        for (let i = lo; i >= Math.ceil(lo * 0.5); i--) {
-          if (remaining[i] === "/" || remaining[i] === "_") {
-            breakIdx = i + 1;
-            break;
-          }
-        }
-        lines.push(remaining.slice(0, breakIdx));
-        remaining = remaining.slice(breakIdx);
-      }
-      const lineSpacing = fontSize + 2;
-      lines.forEach((line, i) => {
-        const tspan = document.createElementNS(SVG_NS, "tspan");
-        tspan.setAttribute("x", x);
-        if (i > 0) tspan.setAttribute("dy", lineSpacing + "px");
-        tspan.textContent = line;
-        textEl.appendChild(tspan);
-      });
-      return lines.length;
-    }
-
     _truncateSVGText(textEl, text, maxWidth, fontSize) {
       if (this.measureTextWidth(text, fontSize) <= maxWidth) {
         textEl.textContent = text;
